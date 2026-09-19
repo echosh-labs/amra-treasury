@@ -1,0 +1,35 @@
+# Binaries and build outputs
+bin/
+*.exe
+dist/
+out/
+.next/
+backend/cmd/server/frontend_out/*
+!backend/cmd/server/frontend_out/.gitkeep
+
+# BoltDB and persistent data
+*.db
+.data/
+*.db.lock
+
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.key.json
+.service-account.json
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

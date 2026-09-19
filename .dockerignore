@@ -1,0 +1,8 @@
+.git
+.data/
+*.db
+bin/
+node_modules/
+dist/
+.next/
+*.log
