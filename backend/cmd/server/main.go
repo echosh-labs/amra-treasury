@@ -13,10 +13,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/echosh-labs/amra-treasury/internal/amra"
 	"github.com/echosh-labs/amra-treasury/internal/api"
 	"github.com/echosh-labs/amra-treasury/internal/config"
 	"github.com/echosh-labs/amra-treasury/internal/db"
+	"github.com/echosh-labs/amra-treasury/internal/mcp"
 	"github.com/echosh-labs/amra-treasury/internal/portutil"
+	"github.com/echosh-labs/amra-treasury/internal/youtube"
 )
 
 //go:embed all:frontend_out/*
@@ -50,9 +53,36 @@ func main() {
 		log.Printf("Warning: failed to seed esoteric content: %v", err)
 	}
 
-	// 2. Initialize API Router
+	// 2. Initialize Engines & MCP Server
 	apiHandler := api.NewHandler(cfg, store)
+
+	ytSecrets := youtube.NewEnvSecretProvider(cfg.YouTubeClientID, cfg.YouTubeClientSecret, cfg.YouTubeRedirectURL)
+	ytClient := youtube.NewClient(ytSecrets, store, nil)
+
+	var paymentProviders []amra.PaymentProvider
+	if cfg.StripeAPIKey != "" {
+		paymentProviders = append(paymentProviders, amra.NewStripePaymentProvider(cfg.StripeAPIKey, cfg.StripeWebhookSecret))
+	} else {
+		paymentProviders = append(paymentProviders, amra.NewMockPaymentProvider("dev_mock_secret"))
+	}
+	amraEngine := amra.NewEngine(store, paymentProviders...)
+
+	mcpHandler := mcp.NewHandler(apiHandler, store, cfg, amraEngine, ytClient)
+	mcpServer := mcp.NewServer(mcpHandler, "")
+
+	// Check if stdio MCP mode requested
+	for _, arg := range os.Args[1:] {
+		if arg == "--mcp" || arg == "-mcp" {
+			log.Println("Starting AMRA Treasury in Stdio MCP mode...")
+			if err := mcpServer.ServeStdio(os.Stdin, os.Stdout); err != nil {
+				log.Fatalf("MCP Stdio server error: %v", err)
+			}
+			return
+		}
+	}
+
 	rootMux := http.NewServeMux()
+	mcpServer.RegisterRoutes(rootMux)
 	api.RegisterRoutes(rootMux, apiHandler)
 
 	// 3. Mount Embedded Next.js 15 Frontend Export

@@ -102,8 +102,9 @@ assert_endpoint "GET" "/api/v1/amra/ledger" '"ledger"' "BoltDB Immutable Audit L
 assert_endpoint "GET" "/api/v1/amra/geometry" '"body"' "Vedic Parametric Mango Geometry"
 assert_endpoint "GET" "/api/v1/amra/gcloud/status" '"account"' "Google Cloud Project Topology"
 assert_endpoint "GET" "/api/v1/esoteric/arishadvarga" '"demons"' "6 Arishadvarga Inner Adversaries"
+assert_endpoint "GET" "/mcp" '"service":"amra-treasury-mcp"' "Streamable HTTP MCP Transport Endpoint"
 assert_endpoint "GET" "/" "AMRA Sovereign Treasury" "Embedded Static Frontend Root"
 
 echo -e "\n${GREEN}════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}✔ ALL 12 INTEGRATION SMOKE TESTS PASSED CLEANLY ON PORT ${TARGET_PORT}!${NC}"
+echo -e "${GREEN}✔ ALL 13 INTEGRATION SMOKE TESTS PASSED CLEANLY ON PORT ${TARGET_PORT}!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
