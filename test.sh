@@ -25,6 +25,11 @@ cleanup() {
     wait "${SERVER_PID}" 2>/dev/null || true
   fi
   rm -rf "${TMP_DB_DIR}"
+  # Restart daemon if active
+  if systemctl is-enabled amra-treasury &>/dev/null; then
+    echo -e "${CYAN}Restarting amra-treasury daemon service...${NC}"
+    sudo systemctl restart amra-treasury || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
@@ -104,9 +109,11 @@ assert_endpoint "GET" "/api/v1/amra/geometry/toroid" '"geometry"' "Toroidal Sing
 assert_endpoint "GET" "/api/v1/amra/artwork" '"catalog"' "Sacred Artwork Atelier Catalog"
 assert_endpoint "GET" "/api/v1/amra/gcloud/status" '"account"' "Google Cloud Project Topology"
 assert_endpoint "GET" "/api/v1/esoteric/arishadvarga" '"demons"' "6 Arishadvarga Inner Adversaries"
+assert_endpoint "GET" "/api/v1/studio/manifests" '"manifests"' "Creative Studio Manifest Store"
 assert_endpoint "GET" "/mcp" '"service":"amra-treasury-mcp"' "Streamable HTTP MCP Transport Endpoint"
 assert_endpoint "GET" "/" "AMRA Sovereign Treasury" "Embedded Static Frontend Root"
+assert_endpoint "GET" "/studio" "Creative Studio" "Creative Studio Long-Form Video Suite Route"
 
 echo -e "\n${GREEN}════════════════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}✔ ALL 15 INTEGRATION SMOKE TESTS PASSED CLEANLY ON PORT ${TARGET_PORT}!${NC}"
+echo -e "${GREEN}✔ ALL 17 INTEGRATION SMOKE TESTS PASSED CLEANLY ON PORT ${TARGET_PORT}!${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"

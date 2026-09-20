@@ -21,6 +21,9 @@ export default function AmraNavigation() {
     if (route === "/sacred-objects") {
       return pathname === "/sacred-objects" || pathname === "/objects";
     }
+    if (route === "/studio") {
+      return pathname === "/studio";
+    }
     if (route === "/treasury") {
       return pathname === "/treasury";
     }
@@ -47,6 +50,16 @@ export default function AmraNavigation() {
       activeBorder: "border-amber-500/50",
       activeBg: "bg-amber-950/40 text-amber-300",
       glow: "shadow-[0_0_15px_rgba(245,158,11,0.15)]",
+    },
+    {
+      href: "/studio",
+      label: "Creative Studio",
+      subLabel: "Long-Form Video, Live Stream & Timeline",
+      icon: Video,
+      color: "text-purple-400",
+      activeBorder: "border-purple-500/50",
+      activeBg: "bg-purple-950/40 text-purple-300",
+      glow: "shadow-[0_0_15px_rgba(168,85,247,0.15)]",
     },
     {
       href: "/treasury",

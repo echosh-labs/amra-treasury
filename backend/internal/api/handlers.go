@@ -10,16 +10,18 @@ import (
 	"github.com/echosh-labs/amra-treasury/internal/amra"
 	"github.com/echosh-labs/amra-treasury/internal/config"
 	"github.com/echosh-labs/amra-treasury/internal/db"
+	"github.com/echosh-labs/amra-treasury/internal/studio"
 	"github.com/echosh-labs/amra-treasury/internal/youtube"
 )
 
 type Handler struct {
-	cfg         *config.Config
-	store       db.StorageEngine
-	youtube     *youtube.Client
-	amraEngine  *amra.Engine
-	amraHandler *amra.Handler
-	startTime   time.Time
+	cfg           *config.Config
+	store         db.StorageEngine
+	youtube       *youtube.Client
+	amraEngine    *amra.Engine
+	amraHandler   *amra.Handler
+	studioHandler *studio.Handler
+	startTime     time.Time
 }
 
 func NewHandler(cfg *config.Config, store db.StorageEngine) *Handler {
@@ -37,14 +39,16 @@ func NewHandler(cfg *config.Config, store db.StorageEngine) *Handler {
 
 	amraEngine := amra.NewEngine(store, paymentProviders...)
 	amraHandler := amra.NewHandler(amraEngine)
+	studioHandler := studio.NewHandler(ytClient.GetUploader(), ".data/renders")
 
 	return &Handler{
-		cfg:         cfg,
-		store:       store,
-		youtube:     ytClient,
-		amraEngine:  amraEngine,
-		amraHandler: amraHandler,
-		startTime:   time.Now().UTC(),
+		cfg:           cfg,
+		store:         store,
+		youtube:       ytClient,
+		amraEngine:    amraEngine,
+		amraHandler:   amraHandler,
+		studioHandler: studioHandler,
+		startTime:     time.Now().UTC(),
 	}
 }
 

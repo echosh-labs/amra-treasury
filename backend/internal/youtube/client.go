@@ -48,6 +48,11 @@ func (c *Client) SetAstrologicalEnricher(fn func() string) {
 	c.pipelineStep = NewYouTubeUploadStep(c.uploader, fn)
 }
 
+// GetUploader returns the underlying YouTube uploader instance.
+func (c *Client) GetUploader() *Uploader {
+	return c.uploader
+}
+
 // IsConfigured returns true if OAuth client credentials (client_id & client_secret) are present.
 func (c *Client) IsConfigured(ctx context.Context) bool {
 	creds, err := c.secrets.GetCredentials(ctx)

@@ -72,6 +72,15 @@ func RegisterRoutes(mux *http.ServeMux, handler *Handler) {
 	mux.HandleFunc("GET /api/v1/amra/gcloud/billing", handler.amraHandler.GCloudBillingHandler)
 	mux.HandleFunc("POST /api/v1/amra/gcloud/sync-ledger", handler.amraHandler.GCloudSyncLedgerHandler)
 
+	// Creative Studio & Video Pipeline Endpoints
+	mux.HandleFunc("GET /api/v1/studio/manifests", handler.studioHandler.ListManifestsHandler)
+	mux.HandleFunc("POST /api/v1/studio/manifests", handler.studioHandler.SaveManifestHandler)
+	mux.HandleFunc("GET /api/v1/studio/stream", handler.studioHandler.LiveStreamHandler)
+	mux.HandleFunc("POST /api/v1/studio/render", handler.studioHandler.LaunchRenderJobHandler)
+	mux.HandleFunc("GET /api/v1/studio/jobs", handler.studioHandler.ListRenderJobsHandler)
+	mux.HandleFunc("GET /api/v1/studio/jobs/{id...}", handler.studioHandler.GetRenderJobHandler)
+	mux.HandleFunc("POST /api/v1/studio/dispatch", handler.studioHandler.DispatchToYouTubeHandler)
+
 	// Esoteric Document Catalog Endpoints
 	mux.HandleFunc("GET /api/v1/esoteric", handler.GetEsotericCatalogHandler)
 	mux.HandleFunc("GET /api/v1/esoteric/arishadvarga", handler.GetArishadvargaHandler)
