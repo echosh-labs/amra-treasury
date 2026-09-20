@@ -53,16 +53,17 @@ export default function YouTubeDispatchModal({
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/v1/studio/jobs?id=${activeJobId}`);
+        const res = await fetch(`/api/v1/studio/jobs/${activeJobId}`);
         if (!res.ok) return;
         const data = await res.json();
-        setJobStatus(data.status);
-        setJobProgress(data.progress || 0);
+        const job = data.job || (data.jobs && data.jobs[0]) || data;
+        setJobStatus(job.status);
+        setJobProgress(job.progress_pct !== undefined ? job.progress_pct : (job.progress || 0));
 
-        if (data.status === "completed") {
-          setRenderedFilePath(data.outputPath);
-        } else if (data.status === "failed") {
-          setErrorMessage(data.error || "Render job encountered an error");
+        if (job.status === "completed") {
+          setRenderedFilePath(job.output_path || job.outputPath);
+        } else if (job.status === "failed") {
+          setErrorMessage(job.error_message || job.error || "Render job encountered an error");
         }
       } catch (err) {
         console.error("Polling error:", err);
