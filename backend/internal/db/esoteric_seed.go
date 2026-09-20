@@ -56,6 +56,29 @@ type MathematicalFoundationsDoc struct {
 	Formulas          map[string]string `json:"formulas"`
 }
 
+// ToroidPresetDoc defines a stored preset configuration for the Toroidal Singularity.
+type ToroidPresetDoc struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	MajorRadius float64 `json:"major_radius"`
+	MinorRadius float64 `json:"minor_radius"`
+	LineCount   int     `json:"line_count"`
+	MissMargin  float64 `json:"miss_margin"`
+	TiltAngle   float64 `json:"tilt_angle"`
+	Mode        string  `json:"mode"`
+}
+
+// ToroidArtworkDoc stores the metadata, formulas, and presets for the Toroidal Singularity sacred geometry.
+type ToroidArtworkDoc struct {
+	Key         string            `json:"key"`
+	Title       string            `json:"title"`
+	Subtitle    string            `json:"subtitle"`
+	Description string            `json:"description"`
+	Formulas    map[string]string `json:"formulas"`
+	Presets     []ToroidPresetDoc `json:"presets"`
+}
+
 // DefaultArishadvargaDemons returns the 6 classical inner adversaries with authoritative transmutations.
 func DefaultArishadvargaDemons() []ArishadvargaDemon {
 	return []ArishadvargaDemon{
@@ -174,6 +197,81 @@ func DefaultMathematicalFoundationsDoc() MathematicalFoundationsDoc {
 	}
 }
 
+// DefaultToroidArtworkDoc returns the canonical Toroidal Singularity specification.
+func DefaultToroidArtworkDoc() ToroidArtworkDoc {
+	return ToroidArtworkDoc{
+		Key:         "esoteric:toroid_geometry",
+		Title:       "Toroidal Singularity & Sacred Akasha Vortex",
+		Subtitle:    "Circumscribed Precessing Filaments around the Unmanifest Void",
+		Description: "A self-organizing vortex where each circumscribed line traces an orbit around the central void, deliberately missing its starting point to prevent closure and generate eternal harmonic renewal. At the center lies the pitch-black Event Horizon (Bindu).",
+		Formulas: map[string]string{
+			"orbit_center":        "C_k = (R · cos(k · Δθ), R · sin(k · Δθ) · cos(α))",
+			"precession_advance": "θ_precess = k · (2π / N + δ_miss)",
+			"event_horizon_void": "r_hole = |R - r| · Scale  [Singularity Void]",
+			"outer_perimeter":    "r_outer = (R + r) · Scale  [Outer Boundary]",
+			"closure_gap":        "Gap = 2 · r · sin(δ_miss / 2)",
+			"aspect_ratio":       "R / r ≈ 1.368 (Harmonic Akasha Ratio)",
+		},
+		Presets: []ToroidPresetDoc{
+			{
+				ID:          "canonical_108",
+				Name:        "Canonical Akasha (108 Filaments)",
+				Description: "Sacred 108 precessing rings with 7.5° miss margin and balanced event horizon.",
+				MajorRadius: 130.0,
+				MinorRadius: 95.0,
+				LineCount:   108,
+				MissMargin:  7.5,
+				TiltAngle:   0.0,
+				Mode:        "discrete_rings",
+			},
+			{
+				ID:          "black_hole_singularity",
+				Name:        "Black Hole Event Horizon",
+				Description: "Dense 180 filaments with expansive central void and high-precision miss margin.",
+				MajorRadius: 150.0,
+				MinorRadius: 75.0,
+				LineCount:   180,
+				MissMargin:  4.2,
+				TiltAngle:   0.0,
+				Mode:        "discrete_rings",
+			},
+			{
+				ID:          "golden_spiral_vortex",
+				Name:        "Golden Phi Vortex (Continuous Filament)",
+				Description: "Continuous unbroken filament precessing at the golden angle (13.75°).",
+				MajorRadius: 120.0,
+				MinorRadius: 90.0,
+				LineCount:   144,
+				MissMargin:  13.75,
+				TiltAngle:   0.0,
+				Mode:        "continuous",
+			},
+			{
+				ID:          "minimal_chords",
+				Name:        "Sacred String-Art Chords",
+				Description: "Minimalist circumscribed chord tangents connecting inner void to outer sphere.",
+				MajorRadius: 135.0,
+				MinorRadius: 85.0,
+				LineCount:   72,
+				MissMargin:  15.0,
+				TiltAngle:   0.0,
+				Mode:        "chords",
+			},
+			{
+				ID:          "deep_isometric_torus",
+				Name:        "Deep Space Isometric Torus",
+				Description: "3D perspective tilt (35°) revealing the toroidal donut depth and volumetric flow.",
+				MajorRadius: 130.0,
+				MinorRadius: 85.0,
+				LineCount:   108,
+				MissMargin:  8.0,
+				TiltAngle:   35.0,
+				Mode:        "discrete_rings",
+			},
+		},
+	}
+}
+
 // SeedEsotericContent populates the BoltDB esoteric_content bucket with canonical documents.
 // It is idempotent: only writes documents if they do not already exist.
 func SeedEsotericContent(store StorageEngine) error {
@@ -232,6 +330,18 @@ func SeedEsotericContent(store StorageEngine) error {
 		}
 		if err := store.SaveEsotericContent("esoteric:mathematical_foundations", data); err != nil {
 			return fmt.Errorf("failed to seed esoteric:mathematical_foundations: %w", err)
+		}
+	}
+
+	// 5. Seed Toroid Artwork Document
+	if _, err := store.GetEsotericContent("esoteric:toroid_geometry"); errors.Is(err, ErrNotFound) {
+		doc := DefaultToroidArtworkDoc()
+		data, err := json.MarshalIndent(doc, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal default toroid artwork: %w", err)
+		}
+		if err := store.SaveEsotericContent("esoteric:toroid_geometry", data); err != nil {
+			return fmt.Errorf("failed to seed esoteric:toroid_geometry: %w", err)
 		}
 	}
 

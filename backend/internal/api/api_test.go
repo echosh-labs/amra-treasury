@@ -128,6 +128,26 @@ func TestAMRA_Endpoints(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
+
+	// 5. Toroid Geometry
+	resp, err = http.Get(ts.URL + "/api/v1/amra/geometry/toroid?lines=72&miss=6.5")
+	if err != nil {
+		t.Fatalf("toroid geometry request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
+
+	// 6. Artwork Catalog
+	resp, err = http.Get(ts.URL + "/api/v1/amra/artwork")
+	if err != nil {
+		t.Fatalf("artwork catalog request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", resp.StatusCode)
+	}
 }
 
 func TestYouTube_Endpoints(t *testing.T) {

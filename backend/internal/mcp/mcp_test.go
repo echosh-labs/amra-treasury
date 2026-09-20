@@ -162,6 +162,33 @@ func TestMCP_ToolsListAndCall(t *testing.T) {
 	if !bytes.Contains([]byte(content[0].Text), []byte("svg_path")) {
 		t.Errorf("expected svg_path in geometry tool output: %s", content[0].Text)
 	}
+
+	// 3. tools/call amra_generate_toroid_geometry
+	toroidReq, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      3,
+		"method":  "tools/call",
+		"params": map[string]any{
+			"name": "amra_generate_toroid_geometry",
+			"arguments": map[string]any{
+				"line_count":  108,
+				"miss_margin": 7.5,
+				"mode":        "discrete_rings",
+			},
+		},
+	})
+	toroidResp := handler.HandleRequest(context.Background(), toroidReq)
+	if toroidResp.Error != nil {
+		t.Fatalf("toroid tools/call error: %v", toroidResp.Error)
+	}
+	toroidMap := toroidResp.Result.(map[string]any)
+	toroidContent := toroidMap["content"].([]mcp.ToolContent)
+	if len(toroidContent) == 0 {
+		t.Fatal("expected toroid tool output content")
+	}
+	if !bytes.Contains([]byte(toroidContent[0].Text), []byte("inner_hole_radius")) {
+		t.Errorf("expected inner_hole_radius in toroid output: %s", toroidContent[0].Text)
+	}
 }
 
 func TestMCP_HTTPServer(t *testing.T) {

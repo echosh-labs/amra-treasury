@@ -231,3 +231,71 @@ export interface GCloudBillingResponse {
   ledger_sync_key: string;
   ledger_synced: boolean;
 }
+
+export interface ToroidParams {
+  major_radius: number;
+  minor_radius: number;
+  line_count: number;
+  miss_margin: number;
+  tilt_angle: number;
+  winding_step?: number;
+  mode?: "discrete_rings" | "continuous" | "chords";
+  scale?: number;
+}
+
+export interface ToroidLoop {
+  index: number;
+  angle_deg: number;
+  center: { x: number; y: number };
+  svg_path: string;
+}
+
+export interface ToroidGeometryResult {
+  params: ToroidParams;
+  svg_path: string;
+  loops: ToroidLoop[];
+  bounding_box: { min_x: number; max_x: number; min_y: number; max_y: number };
+  inner_hole_radius: number;
+  outer_radius: number;
+  closure_gap: number;
+  total_filaments: number;
+  formulas: Record<string, string>;
+  sacred_philosophy: string;
+}
+
+export interface ToroidPreset {
+  id: string;
+  name: string;
+  description: string;
+  major_radius: number;
+  minor_radius: number;
+  line_count: number;
+  miss_margin: number;
+  tilt_angle: number;
+  mode: "discrete_rings" | "continuous" | "chords";
+}
+
+export interface ToroidArtworkDoc {
+  key: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  formulas: Record<string, string>;
+  presets: ToroidPreset[];
+}
+
+export interface ToroidApiResponse {
+  geometry: ToroidGeometryResult;
+  presets: ToroidPreset[];
+  metadata: ToroidArtworkDoc | null;
+}
+
+export interface ArtworkCatalogItem {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  endpoint: string;
+  metadata?: any;
+}
+

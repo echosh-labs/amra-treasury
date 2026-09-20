@@ -342,3 +342,27 @@ func (e *Engine) GetTransmutationTriad() (*db.TransmutationTriadDoc, error) {
 	return &doc, nil
 }
 
+// GetToroidArtwork loads the Toroidal Singularity specification and presets from BoltDB.
+func (e *Engine) GetToroidArtwork() (*db.ToroidArtworkDoc, error) {
+	raw, err := e.store.GetEsotericContent("esoteric:toroid_geometry")
+	if err != nil {
+		doc := db.DefaultToroidArtworkDoc()
+		return &doc, nil
+	}
+	var doc db.ToroidArtworkDoc
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		def := db.DefaultToroidArtworkDoc()
+		return &def, nil
+	}
+	return &doc, nil
+}
+
+// SaveToroidArtwork saves custom toroid presets or artwork configurations to BoltDB.
+func (e *Engine) SaveToroidArtwork(doc *db.ToroidArtworkDoc) error {
+	data, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return err
+	}
+	return e.store.SaveEsotericContent("esoteric:toroid_geometry", data)
+}
+

@@ -150,6 +150,12 @@ func (h *Handler) handleResourcesList() map[string]any {
 			MimeType:    "application/json",
 		},
 		{
+			URI:         "amra://artwork/toroid",
+			Name:        "Toroidal Singularity Sacred Geometry",
+			Description: "Mathematical parameters, circumscribed filament coordinates, and event horizon black hole void geometry.",
+			MimeType:    "application/json",
+		},
+		{
 			URI:         "youtube://status",
 			Name:        "YouTube Channel Status & Quota",
 			Description: "Verified YouTube channel identity, OAuth2 token validity, and daily API quota tracker.",
@@ -218,6 +224,12 @@ func (h *Handler) handleResourcesRead(ctx context.Context, params any) (map[stri
 		b, _ := json.MarshalIndent(geo, "", "  ")
 		text = string(b)
 
+	case "amra://artwork/toroid":
+		params := amra.DefaultToroidParams()
+		geo := amra.CalculateToroidGeometry(params)
+		b, _ := json.MarshalIndent(geo, "", "  ")
+		text = string(b)
+
 	case "youtube://status":
 		status := h.ytClient.GetStatus(ctx)
 		b, _ := json.MarshalIndent(status, "", "  ")
@@ -280,6 +292,21 @@ func (h *Handler) handleToolsList() map[string]any {
 					"hook":           map[string]any{"type": "number", "description": "Crest hook deflection (default: 25.0)"},
 					"shadow_tension": map[string]any{"type": "number", "description": "Asuric shadow tension ratio (0.0 to 1.0)"},
 					"solar_fire":     map[string]any{"type": "number", "description": "Solar fire transmutation coefficient (0.0 to 1.0)"},
+				},
+			},
+		},
+		{
+			Name:        "amra_generate_toroid_geometry",
+			Description: "Compute the Sacred Toroidal Singularity geometry, with circumscribed precessing filaments, central black hole void, and non-closure miss margin.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"major_radius": map[string]any{"type": "number", "description": "Distance to tube center (default: 130.0)"},
+					"minor_radius": map[string]any{"type": "number", "description": "Filament radius (default: 95.0)"},
+					"line_count":   map[string]any{"type": "integer", "description": "Number of circumscribed lines (default: 108)"},
+					"miss_margin":  map[string]any{"type": "number", "description": "Precession angle offset in degrees causing non-closure (default: 7.5)"},
+					"tilt_angle":   map[string]any{"type": "number", "description": "3D perspective tilt in degrees (default: 0)"},
+					"mode":         map[string]any{"type": "string", "description": "Rendering mode: discrete_rings, continuous, or chords"},
 				},
 			},
 		},
@@ -432,6 +459,31 @@ func (h *Handler) handleToolsCall(ctx context.Context, params any) (map[string]a
 		phil, _ := h.amraEngine.GetAmraPhilosophy()
 		triad, _ := h.amraEngine.GetTransmutationTriad()
 		geo := amra.GenerateAmraGeometryWithContent(params, shadowTension, solarFire, demons, phil, triad)
+		b, _ := json.MarshalIndent(geo, "", "  ")
+		result = ToolResult{Content: []ToolContent{{Type: "text", Text: string(b)}}}
+
+	case "amra_generate_toroid_geometry":
+		tParams := amra.DefaultToroidParams()
+		if v, ok := p.Arguments["major_radius"].(float64); ok && v > 0 {
+			tParams.MajorRadius = v
+		}
+		if v, ok := p.Arguments["minor_radius"].(float64); ok && v > 0 {
+			tParams.MinorRadius = v
+		}
+		if v, ok := p.Arguments["line_count"].(float64); ok && v > 0 {
+			tParams.LineCount = int(v)
+		}
+		if v, ok := p.Arguments["miss_margin"].(float64); ok {
+			tParams.MissMargin = v
+		}
+		if v, ok := p.Arguments["tilt_angle"].(float64); ok {
+			tParams.TiltAngle = v
+		}
+		if v, ok := p.Arguments["mode"].(string); ok && v != "" {
+			tParams.Mode = v
+		}
+
+		geo := amra.CalculateToroidGeometry(tParams)
 		b, _ := json.MarshalIndent(geo, "", "  ")
 		result = ToolResult{Content: []ToolContent{{Type: "text", Text: string(b)}}}
 

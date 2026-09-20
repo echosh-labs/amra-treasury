@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
+
+	"github.com/echosh-labs/amra-treasury/internal/db"
 )
 
 // Handler serves HTTP endpoints for AMRA financial operations.
@@ -269,3 +272,175 @@ func (h *Handler) GCloudSyncLedgerHandler(w http.ResponseWriter, r *http.Request
 		"transaction": tx,
 	})
 }
+
+// ToroidGeometryHandler calculates the Sacred Toroidal Singularity geometry,
+// with circumscribed precessing filaments, central black hole void, and non-closure miss margin.
+func (h *Handler) ToroidGeometryHandler(w http.ResponseWriter, r *http.Request) {
+	params := DefaultToroidParams()
+
+	// Handle optional POST request body
+	if r.Method == http.MethodPost && r.Body != nil {
+		var req struct {
+			MajorRadius float64 `json:"major_radius"`
+			MinorRadius float64 `json:"minor_radius"`
+			LineCount   int     `json:"line_count"`
+			MissMargin  float64 `json:"miss_margin"`
+			TiltAngle   float64 `json:"tilt_angle"`
+			WindingStep int     `json:"winding_step"`
+			Mode        string  `json:"mode"`
+			Scale       float64 `json:"scale"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if req.MajorRadius > 0 {
+				params.MajorRadius = req.MajorRadius
+			}
+			if req.MinorRadius > 0 {
+				params.MinorRadius = req.MinorRadius
+			}
+			if req.LineCount > 0 {
+				params.LineCount = req.LineCount
+			}
+			if req.MissMargin != 0 {
+				params.MissMargin = req.MissMargin
+			}
+			if req.TiltAngle != 0 {
+				params.TiltAngle = req.TiltAngle
+			}
+			if req.WindingStep > 0 {
+				params.WindingStep = req.WindingStep
+			}
+			if req.Mode != "" {
+				params.Mode = req.Mode
+			}
+			if req.Scale > 0 {
+				params.Scale = req.Scale
+			}
+		}
+	}
+
+	// Handle optional GET query parameters
+	q := r.URL.Query()
+	if v := q.Get("r_major"); v != "" {
+		if val, err := strconv.ParseFloat(v, 64); err == nil && val > 0 {
+			params.MajorRadius = val
+		}
+	}
+	if v := q.Get("r_minor"); v != "" {
+		if val, err := strconv.ParseFloat(v, 64); err == nil && val > 0 {
+			params.MinorRadius = val
+		}
+	}
+	if v := q.Get("lines"); v != "" {
+		if val, err := strconv.Atoi(v); err == nil && val > 0 {
+			params.LineCount = val
+		}
+	}
+	if v := q.Get("miss"); v != "" {
+		if val, err := strconv.ParseFloat(v, 64); err == nil {
+			params.MissMargin = val
+		}
+	}
+	if v := q.Get("tilt"); v != "" {
+		if val, err := strconv.ParseFloat(v, 64); err == nil {
+			params.TiltAngle = val
+		}
+	}
+	if v := q.Get("step"); v != "" {
+		if val, err := strconv.Atoi(v); err == nil && val > 0 {
+			params.WindingStep = val
+		}
+	}
+	if v := q.Get("mode"); v != "" {
+		params.Mode = v
+	}
+	if v := q.Get("scale"); v != "" {
+		if val, err := strconv.ParseFloat(v, 64); err == nil && val > 0 {
+			params.Scale = val
+		}
+	}
+
+	geo := CalculateToroidGeometry(params)
+
+	// Enrich with presets from database doc if available
+	doc, err := h.engine.GetToroidArtwork()
+	var presets []db.ToroidPresetDoc
+	if err == nil && doc != nil {
+		presets = doc.Presets
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"geometry": geo,
+		"presets":  presets,
+		"metadata": doc,
+	})
+}
+
+// ArtworkCatalogHandler returns all available sacred artworks in the AMRA Treasury Storehouse.
+func (h *Handler) ArtworkCatalogHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		// Save new preset to toroid artwork document
+		var newPreset db.ToroidPresetDoc
+		if err := json.NewDecoder(r.Body).Decode(&newPreset); err != nil {
+			http.Error(w, `{"error":"invalid preset payload"}`, http.StatusBadRequest)
+			return
+		}
+		if newPreset.ID == "" {
+			newPreset.ID = fmt.Sprintf("preset_%d", time.Now().Unix())
+		}
+		if newPreset.Name == "" {
+			newPreset.Name = "Custom Torus Preset"
+		}
+
+		doc, _ := h.engine.GetToroidArtwork()
+		if doc == nil {
+			d := db.DefaultToroidArtworkDoc()
+			doc = &d
+		}
+		doc.Presets = append(doc.Presets, newPreset)
+		if err := h.engine.SaveToroidArtwork(doc); err != nil {
+			http.Error(w, `{"error":"failed to persist preset"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "saved",
+			"preset": newPreset,
+		})
+		return
+	}
+
+	// GET: Return entire artwork catalog
+	toroidDoc, _ := h.engine.GetToroidArtwork()
+	philosophy, _ := h.engine.GetAmraPhilosophy()
+
+	catalog := []map[string]any{
+		{
+			"id":          "toroid_singularity",
+			"name":        "Toroidal Singularity (Akasha Spanda)",
+			"category":    "sacred_geometry",
+			"description": "Circumscribed precessing filaments forming an event horizon black hole void with intentional non-closing miss margin.",
+			"endpoint":    "/api/v1/amra/geometry/toroid",
+			"metadata":    toroidDoc,
+		},
+		{
+			"id":          "amra_mango",
+			"name":        "Āmra Rūpa & Shadow Alchemy (Jnana-Phala)",
+			"category":    "sacred_geometry",
+			"description": "Parametric Kairi curve with indestructible Bīja seed and Arishadvarga shadow transmutation.",
+			"endpoint":    "/api/v1/amra/geometry",
+			"metadata":    philosophy,
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"catalog": catalog,
+		"count":   len(catalog),
+	})
+}
+

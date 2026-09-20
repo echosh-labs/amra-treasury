@@ -13,6 +13,9 @@ import {
   Sparkles,
   Cloud,
   ArrowUpRight,
+  Circle,
+  Layers,
+  Palette,
 } from "lucide-react";
 import { useYouTubeStudio } from "@/lib/youtube-context";
 import { useToast } from "@/lib/toast-context";
@@ -32,6 +35,7 @@ import YouTubeRevenueCard from "./treasury/youtube-revenue-card";
 import AMRALedgerTable from "./treasury/amra-ledger-table";
 import AMRASubscriptionGrid from "./treasury/amra-subscription-grid";
 import MangoGeometryVisualizer from "./treasury/mango-geometry-visualizer";
+import ToroidGeometryVisualizer from "./treasury/toroid-geometry-visualizer";
 
 export default function AMRATreasuryStudio() {
   const { status: ytStatus } = useYouTubeStudio();
@@ -60,6 +64,7 @@ export default function AMRATreasuryStudio() {
   const [geoHeat, setGeoHeat] = useState(0.80);
   const [geoData, setGeoData] = useState<AmraGeometryData | null>(null);
   const [loadingGeo, setLoadingGeo] = useState(false);
+  const [artworkView, setArtworkView] = useState<"toroid" | "mango" | "dual">("toroid");
 
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [loadingLedger, setLoadingLedger] = useState(false);
@@ -376,8 +381,8 @@ export default function AMRATreasuryStudio() {
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>Sacred Geometry &amp; Shadow Alchemy</span>
+          <Palette className="w-3.5 h-3.5 text-amber-400" />
+          <span>Sacred Artwork Atelier</span>
         </button>
 
         <button
@@ -564,40 +569,144 @@ export default function AMRATreasuryStudio() {
         <AMRASubscriptionGrid plans={plans} onCheckout={handleCheckout} />
       )}
 
-      {/* 7. Sub-View: Sacred Geometry & Shadow Alchemy */}
+      {/* 7. Sub-View: Sacred Artwork Atelier (Toroidal Singularity & Āmra Rūpa) */}
       {activeSubTab === "geometry" && (
-        <MangoGeometryVisualizer
-          geoBelly={geoBelly}
-          geoHook={geoHook}
-          geoShadow={geoShadow}
-          geoHeat={geoHeat}
-          geoData={geoData}
-          loadingGeo={loadingGeo}
-          onBellyChange={(v) => {
-            setGeoBelly(v);
-            loadGeometry(v, geoHook, geoShadow, geoHeat);
-          }}
-          onHookChange={(v) => {
-            setGeoHook(v);
-            loadGeometry(geoBelly, v, geoShadow, geoHeat);
-          }}
-          onShadowChange={(v) => {
-            setGeoShadow(v);
-            loadGeometry(geoBelly, geoHook, v, geoHeat);
-          }}
-          onHeatChange={(v) => {
-            setGeoHeat(v);
-            loadGeometry(geoBelly, geoHook, geoShadow, v);
-          }}
-          onPreset={(b, h, s, t) => {
-            setGeoBelly(b);
-            setGeoHook(h);
-            setGeoShadow(s);
-            setGeoHeat(t);
-            loadGeometry(b, h, s, t);
-          }}
-          onReload={() => loadGeometry()}
-        />
+        <div className="space-y-6">
+          {/* Gallery Mode Selector Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 gap-3">
+            <div className="flex items-center flex-wrap gap-2">
+              <span className="text-xs font-mono text-slate-400 pl-2">ARTWORK:</span>
+              <button
+                onClick={() => setArtworkView("toroid")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center space-x-1.5 transition ${
+                  artworkView === "toroid"
+                    ? "bg-slate-800 text-cyan-300 border border-slate-700 font-semibold shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Circle className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Toroidal Singularity (Spanda)</span>
+              </button>
+
+              <button
+                onClick={() => setArtworkView("mango")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center space-x-1.5 transition ${
+                  artworkView === "mango"
+                    ? "bg-slate-800 text-amber-300 border border-slate-700 font-semibold shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Āmra Rūpa &amp; Shadow Alchemy</span>
+              </button>
+
+              <button
+                onClick={() => setArtworkView("dual")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center space-x-1.5 transition ${
+                  artworkView === "dual"
+                    ? "bg-slate-800 text-purple-300 border border-slate-700 font-semibold shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 text-purple-400" />
+                <span>Dual Atelier View</span>
+              </button>
+            </div>
+
+            <div className="text-[11px] font-mono text-slate-500 pr-2 hidden md:block">
+              Vedic &amp; Parametric Mathematical Artworks
+            </div>
+          </div>
+
+          {/* Artwork Displays */}
+          {artworkView === "toroid" && <ToroidGeometryVisualizer />}
+
+          {artworkView === "mango" && (
+            <MangoGeometryVisualizer
+              geoBelly={geoBelly}
+              geoHook={geoHook}
+              geoShadow={geoShadow}
+              geoHeat={geoHeat}
+              geoData={geoData}
+              loadingGeo={loadingGeo}
+              onBellyChange={(v) => {
+                setGeoBelly(v);
+                loadGeometry(v, geoHook, geoShadow, geoHeat);
+              }}
+              onHookChange={(v) => {
+                setGeoHook(v);
+                loadGeometry(geoBelly, v, geoShadow, geoHeat);
+              }}
+              onShadowChange={(v) => {
+                setGeoShadow(v);
+                loadGeometry(geoBelly, geoHook, v, geoHeat);
+              }}
+              onHeatChange={(v) => {
+                setGeoHeat(v);
+                loadGeometry(geoBelly, geoHook, geoShadow, v);
+              }}
+              onPreset={(b, h, s, t) => {
+                setGeoBelly(b);
+                setGeoHook(h);
+                setGeoShadow(s);
+                setGeoHeat(t);
+                loadGeometry(b, h, s, t);
+              }}
+              onReload={() => loadGeometry()}
+            />
+          )}
+
+          {artworkView === "dual" && (
+            <div className="space-y-8">
+              <div className="border-b border-slate-800 pb-2">
+                <h4 className="text-sm font-semibold text-cyan-300 font-mono flex items-center gap-2">
+                  <Circle className="w-4 h-4 text-cyan-400" />
+                  <span>I. Toroidal Singularity &amp; Akasha Vortex</span>
+                </h4>
+              </div>
+              <ToroidGeometryVisualizer />
+
+              <div className="border-b border-slate-800 pb-2 pt-6">
+                <h4 className="text-sm font-semibold text-amber-300 font-mono flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>II. Āmra Rūpa (Sacred Mango) &amp; Shadow Alchemy</span>
+                </h4>
+              </div>
+              <MangoGeometryVisualizer
+                geoBelly={geoBelly}
+                geoHook={geoHook}
+                geoShadow={geoShadow}
+                geoHeat={geoHeat}
+                geoData={geoData}
+                loadingGeo={loadingGeo}
+                onBellyChange={(v) => {
+                  setGeoBelly(v);
+                  loadGeometry(v, geoHook, geoShadow, geoHeat);
+                }}
+                onHookChange={(v) => {
+                  setGeoHook(v);
+                  loadGeometry(geoBelly, v, geoShadow, geoHeat);
+                }}
+                onShadowChange={(v) => {
+                  setGeoShadow(v);
+                  loadGeometry(geoBelly, geoHook, v, geoHeat);
+                }}
+                onHeatChange={(v) => {
+                  setGeoHeat(v);
+                  loadGeometry(geoBelly, geoHook, geoShadow, v);
+                }}
+                onPreset={(b, h, s, t) => {
+                  setGeoBelly(b);
+                  setGeoHook(h);
+                  setGeoShadow(s);
+                  setGeoHeat(t);
+                  loadGeometry(b, h, s, t);
+                }}
+                onReload={() => loadGeometry()}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {/* 8. Sub-View: Google Cloud Infrastructure & Billing */}
