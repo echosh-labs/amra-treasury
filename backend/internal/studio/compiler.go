@@ -6,13 +6,19 @@ import (
 
 // CompiledObjectState represents the exact interpolated transform of a graphic object at time t.
 type CompiledObjectState struct {
-	ObjectID  string  `json:"object_id"`
-	Scale     float64 `json:"scale"`
-	X         float64 `json:"x"`
-	Y         float64 `json:"y"`
-	Opacity   float64 `json:"opacity"`
-	PranaRate float64 `json:"prana_rate"`
-	ThemeID   string  `json:"theme_id"`
+	ObjectID    string  `json:"object_id"`
+	Scale       float64 `json:"scale"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+	Opacity     float64 `json:"opacity"`
+	PranaRate   float64 `json:"prana_rate"`
+	ThemeID     string  `json:"theme_id"`
+	NextThemeID string  `json:"next_theme_id,omitempty"`
+	ThemeFactor float64 `json:"theme_factor"`
+	Belly       float64 `json:"belly"`
+	Hook        float64 `json:"hook"`
+	Shadow      float64 `json:"shadow"`
+	SolarAgni   float64 `json:"solar_agni"`
 }
 
 // CompiledFrameState captures the complete rendered state of the composition at any second t.
@@ -25,6 +31,13 @@ type CompiledFrameState struct {
 	HueOffset     float64               `json:"hue_offset"`
 	BackdropStyle string                `json:"backdrop_style"`
 	Palette       string                `json:"palette"`
+	WaveMode      string                `json:"wave_mode"`
+	MajorRadius   float64               `json:"major_radius"`
+	MinorRadius   float64               `json:"minor_radius"`
+	LineCount     int                   `json:"line_count"`
+	MissMargin    float64               `json:"miss_margin"`
+	TiltAngle     float64               `json:"tilt_angle"`
+	SpaceGlow     float64               `json:"space_glow"`
 	Objects       []CompiledObjectState `json:"objects"`
 	PrimaryFreqHz float64               `json:"primary_freq_hz"`
 }
@@ -76,6 +89,16 @@ func (c *TimelineCompiler) Evaluate(m *StudioTimelineManifest, tSec float64) *Co
 
 		state := c.interpolateKeyframes(objTrack.Keyframes, cycleTime, baseCycle)
 		state.ObjectID = objTrack.ObjectID
+		state.Belly = objTrack.Belly
+		if state.Belly <= 0 {
+			state.Belly = 125.0
+		}
+		state.Hook = objTrack.Hook
+		if state.Hook <= 0 {
+			state.Hook = 35.0
+		}
+		state.Shadow = objTrack.Shadow
+		state.SolarAgni = objTrack.SolarAgni
 		compiledObjects = append(compiledObjects, state)
 	}
 
@@ -90,6 +113,31 @@ func (c *TimelineCompiler) Evaluate(m *StudioTimelineManifest, tSec float64) *Co
 		freq = freq * octaveShift
 	}
 
+	majorR := m.Background.MajorRadius
+	if majorR <= 0 {
+		majorR = 130.0
+	}
+	minorR := m.Background.MinorRadius
+	if minorR <= 0 {
+		minorR = 95.0
+	}
+	lineCount := m.Background.LineCount
+	if lineCount <= 0 {
+		lineCount = 108
+	}
+	missMargin := m.Background.MissMargin
+	if missMargin <= 0 {
+		missMargin = 7.5
+	}
+	tiltAngle := m.Background.TiltAngle
+	if tiltAngle <= 0 {
+		tiltAngle = 35.0
+	}
+	spaceGlow := m.Background.SpaceGlow
+	if spaceGlow <= 0 {
+		spaceGlow = 0.45
+	}
+
 	return &CompiledFrameState{
 		TimeSec:       tSec,
 		CycleIndex:    cycleIndex,
@@ -99,6 +147,13 @@ func (c *TimelineCompiler) Evaluate(m *StudioTimelineManifest, tSec float64) *Co
 		HueOffset:     hueOffset,
 		BackdropStyle: m.Background.BackdropStyle,
 		Palette:       m.Background.Palette,
+		WaveMode:      m.Background.WaveMode,
+		MajorRadius:   majorR,
+		MinorRadius:   minorR,
+		LineCount:     lineCount,
+		MissMargin:    missMargin,
+		TiltAngle:     tiltAngle,
+		SpaceGlow:     spaceGlow,
 		Objects:       compiledObjects,
 		PrimaryFreqHz: freq,
 	}
@@ -106,15 +161,20 @@ func (c *TimelineCompiler) Evaluate(m *StudioTimelineManifest, tSec float64) *Co
 
 // interpolateKeyframes interpolates object parameters along the cycle timeline.
 func (c *TimelineCompiler) interpolateKeyframes(kfs []ObjectKeyframe, cycleTime, baseCycle float64) CompiledObjectState {
+	if len(kfs) == 0 {
+		return CompiledObjectState{}
+	}
 	if len(kfs) == 1 {
 		k := kfs[0]
 		return CompiledObjectState{
-			Scale:     k.Scale,
-			X:         k.PositionX,
-			Y:         k.PositionY,
-			Opacity:   k.Opacity,
-			PranaRate: k.PranaRate,
-			ThemeID:   k.ThemeID,
+			Scale:       k.Scale,
+			X:           k.PositionX,
+			Y:           k.PositionY,
+			Opacity:     k.Opacity,
+			PranaRate:   k.PranaRate,
+			ThemeID:     k.ThemeID,
+			NextThemeID: k.ThemeID,
+			ThemeFactor: 0.0,
 		}
 	}
 
@@ -157,16 +217,19 @@ func (c *TimelineCompiler) interpolateKeyframes(kfs []ObjectKeyframe, cycleTime,
 	prana := prev.PranaRate + (next.PranaRate-prev.PranaRate)*factor
 
 	themeID := prev.ThemeID
-	if factor > 0.5 && next.ThemeID != "" {
-		themeID = next.ThemeID
+	nextThemeID := next.ThemeID
+	if nextThemeID == "" {
+		nextThemeID = themeID
 	}
 
 	return CompiledObjectState{
-		Scale:     scale,
-		X:         x,
-		Y:         y,
-		Opacity:   opacity,
-		PranaRate: prana,
-		ThemeID:   themeID,
+		Scale:       scale,
+		X:           x,
+		Y:           y,
+		Opacity:     opacity,
+		PranaRate:   prana,
+		ThemeID:     themeID,
+		NextThemeID: nextThemeID,
+		ThemeFactor: factor,
 	}
 }

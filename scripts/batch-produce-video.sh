@@ -69,6 +69,7 @@ fi
 # 3. Formulate Manifest Payload
 JOB_ID="batch-$(date +%s)"
 MANIFEST_FILE=$(mktemp /tmp/manifest-XXXXXX.json)
+HALF_CYCLE=$(awk "BEGIN {printf \"%.1f\", $BASE_CYCLE / 2}")
 cat <<EOF > "$MANIFEST_FILE"
 {
   "manifest": {
@@ -80,46 +81,53 @@ cat <<EOF > "$MANIFEST_FILE"
       "height": 720,
       "fps": 30
     },
-    "patternLoop": {
-      "baseCycleSeconds": ${BASE_CYCLE},
-      "repeatCount": ${REPEATS},
-      "cycleHueRotationDeg": 15,
-      "harmonicOctaveProgression": true,
-      "pranaHeatIncrement": 0.05
+    "pattern_loop": {
+      "base_cycle_sec": ${BASE_CYCLE},
+      "repeat_count": ${REPEATS},
+      "hue_shift_deg_per_cycle": 15.0,
+      "octave_modulation": true,
+      "prana_heat_increment": 0.05
     },
-    "backgroundTrack": {
-      "geometryStyle": "torus_flower_of_life",
-      "palette": "amra_multivariate",
-      "rotationRateRpm": 1.5,
-      "layerCount": 8,
-      "zoomOscillation": true
+    "background": {
+      "preset_id": "canonical_akasha",
+      "major_radius": 130,
+      "minor_radius": 95,
+      "line_count": 108,
+      "miss_margin": 7.5,
+      "tilt_angle": 35.0,
+      "wave_mode": "orbital_swirl",
+      "palette": "multivariate_facets",
+      "backdrop_style": "cosmic_aurora",
+      "circulation_speed": 1.0,
+      "space_glow": 0.50
     },
-    "objectTracks": [
+    "objects": [
       {
-        "id": "obj-amra-mango",
-        "objectType": "amra_mango",
+        "id": "amra_fruit_primary",
+        "object_id": "amra_fruit",
         "name": "Āmra Rūpa Mango",
-        "anchorX": 0.5,
-        "anchorY": 0.5,
-        "baseScale": 1.0,
-        "glowColor": "#f59e0b",
-        "glowRadius": 32,
-        "animationMode": "pulsing_prana",
+        "enabled": true,
+        "belly": 125,
+        "hook": 35,
+        "shadow": 0.35,
+        "solar_agni": 0.85,
         "keyframes": [
-          { "timeSec": 0, "opacity": 0.3, "scale": 0.9, "rotationDeg": 0 },
-          { "timeSec": $(( BASE_CYCLE / 2 )), "opacity": 1.0, "scale": 1.1, "rotationDeg": 180 },
-          { "timeSec": ${BASE_CYCLE}, "opacity": 0.3, "scale": 0.9, "rotationDeg": 360 }
+          { "time_sec": 0.0, "opacity": 0.95, "scale": 0.95, "prana_rate": 0.9, "theme_id": "pakva_gold", "transition": "ease_in_out" },
+          { "time_sec": ${HALF_CYCLE}, "opacity": 1.0, "scale": 1.05, "prana_rate": 1.1, "theme_id": "surya_agni", "transition": "ease_in_out" },
+          { "time_sec": ${BASE_CYCLE}, "opacity": 0.95, "scale": 0.95, "prana_rate": 0.9, "theme_id": "pakva_gold", "transition": "ease_in_out" }
         ]
       }
     ],
-    "audioTrack": {
-      "enabled": true,
-      "baseFrequencyHz": ${FREQ},
-      "harmonicPreset": "anahata_432",
-      "binauralBeatHz": 4.5,
-      "octaveModulation": true,
-      "volume": 0.75
-    }
+    "audio": [
+      {
+        "id": "harmonic_drone_${FREQ}",
+        "role": "harmonic_drone",
+        "frequency_hz": ${FREQ},
+        "binaural_beat_hz": 7.83,
+        "volume": 0.80,
+        "loop": true
+      }
+    ]
   }
 }
 EOF

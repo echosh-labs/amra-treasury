@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/draw"
 	"io"
 	"log"
 	"math"
@@ -218,51 +217,287 @@ func (r *HeadlessRenderer) executeJob(job *RenderJob) {
 }
 
 func (r *HeadlessRenderer) renderFrameRGBA(img *image.RGBA, w, h int, state *CompiledFrameState) {
-	// Background fill
-	bgCol := color.RGBA{R: 2, G: 6, B: 23, A: 255}
-	switch state.BackdropStyle {
-	case "cosmic_aurora":
-		bgCol = color.RGBA{R: 28, G: 14, B: 52, A: 255}
-	case "emerald_matrix":
-		bgCol = color.RGBA{R: 5, G: 42, B: 32, A: 255}
-	case "solar_corona":
-		bgCol = color.RGBA{R: 50, G: 18, B: 0, A: 255}
+	RenderFrameRGBA(img, w, h, state)
+}
+
+// RenderFrameRGBA renders a high-fidelity visual frame with radial wallpaper shaders,
+// inter-filament caustic glow resonance, precessing antialiased filaments, central event horizon void,
+// and authentic parametric Āmra sacred geometry with alchemical theme transitions.
+func RenderFrameRGBA(img *image.RGBA, w, h int, state *CompiledFrameState) {
+	scaleFactor := math.Min(float64(w), float64(h)) / 500.0
+	centerX := float64(w) / 2.0
+	centerY := float64(h) / 2.0
+
+	// 1. Deep Space Atmospheric Radial Wallpaper
+	FillRadialWallpaper(img, w, h, state.BackdropStyle)
+
+	// 2. Inter-Filament Caustic Resonance (Glow in the space between lines)
+	if state.SpaceGlow > 0 {
+		innerHoleR := math.Abs(state.MajorRadius-state.MinorRadius) * scaleFactor * 0.7
+		outerR := (state.MajorRadius + state.MinorRadius) * scaleFactor * 1.15
+		causticHue := math.Mod(state.Phase*360.0, 360.0)
+		if causticHue < 0 {
+			causticHue += 360.0
+		}
+		waveBoost := (math.Sin(2*math.Pi*state.Phase) + 1.0) * 0.5
+
+		causticCol1 := HSLToRGBA(causticHue, 0.90, 0.55, uint8(state.SpaceGlow*(0.22+waveBoost*0.15)*255.0))
+		causticCol2 := HSLToRGBA(math.Mod(causticHue+120.0, 360.0), 0.85, 0.45, uint8(state.SpaceGlow*0.12*255.0))
+
+		causticStops := []GradientStop{
+			{Offset: 0.0, Color: color.RGBA{R: 0, G: 0, B: 0, A: 0}},
+			{Offset: 0.35, Color: causticCol1},
+			{Offset: 0.75, Color: causticCol2},
+			{Offset: 1.0, Color: color.RGBA{R: 2, G: 6, B: 23, A: 0}},
+		}
+		causticLUT := BuildGradientLUT(causticStops)
+		DrawRadialGlow(img, centerX, centerY, innerHoleR, outerR, causticLUT, 1.0)
 	}
-	draw.Draw(img, img.Bounds(), &image.Uniform{C: bgCol}, image.Point{}, draw.Src)
 
-	centerX := float64(w) / 2
-	centerY := float64(h) / 2
-	radius := float64(h) * 0.38
+	// 3. Render Precessing Toroidal Filaments
+	lineCount := state.LineCount
+	if lineCount < 12 {
+		lineCount = 108
+	}
+	tiltRad := state.TiltAngle * math.Pi / 180.0
+	cosTilt := math.Cos(tiltRad)
+	if cosTilt < 0.1 {
+		cosTilt = 0.1
+	}
+	missMarginRad := state.MissMargin * math.Pi / 180.0
+	stepAngle := (2.0 * math.Pi) / float64(lineCount)
+	majR := state.MajorRadius * scaleFactor
+	minR := state.MinorRadius * scaleFactor
 
-	// Render Toroidal Filaments
-	lines := 72
-	for i := 0; i < lines; i++ {
-		angle := (float64(i)/float64(lines))*2*math.Pi + state.Phase*2*math.Pi
-		cx := centerX + math.Cos(angle)*(radius*0.42)
-		cy := centerY + math.Sin(angle)*(radius*0.28)
-		ringR := radius * 0.52
+	solfeggioHues := []float64{340, 20, 48, 140, 185, 215, 260, 290, 315}
+	chakraHues := []float64{0, 24, 50, 155, 190, 240, 280}
+	alchemicalHues := []float64{42, 210, 28, 220, 195, 270}
 
-		hue := math.Mod(float64(i*8)+state.HueOffset+state.Phase*360.0, 360.0)
-		red, grn, blu := hslToRgb(hue, 0.88, 0.58)
-		strokeCol := color.RGBA{R: red, G: grn, B: blu, A: 175}
+	for k := 0; k < lineCount; k++ {
+		frac := float64(k) / float64(lineCount)
+		var waveFactor float64
 
-		drawCircleRing(img, int(cx), int(cy), int(ringR), strokeCol)
+		switch state.WaveMode {
+		case "singularity_ingestion":
+			waveFactor = math.Cos(2 * math.Pi * (frac*2.0 + state.Phase))
+		case "standing_wave":
+			waveFactor = math.Sin(2*math.Pi*frac) * math.Cos(2*math.Pi*state.Phase)
+		case "doppler_vortex":
+			waveFactor = math.Sin(2 * math.Pi * (math.Pow(frac, 1.5) - state.Phase))
+		default: // "orbital_swirl"
+			waveFactor = math.Sin(2 * math.Pi * (frac - state.Phase))
+		}
+
+		var hue, sat, light float64
+		sat = 88.0
+		light = 54.0 + waveFactor*18.0
+
+		switch state.Palette {
+		case "solfeggio":
+			sLen := float64(len(solfeggioHues))
+			sIdx := math.Mod(frac*sLen+state.Phase*3.0, sLen)
+			if sIdx < 0 {
+				sIdx += sLen
+			}
+			i0 := int(sIdx)
+			i1 := (i0 + 1) % len(solfeggioHues)
+			mix := sIdx - float64(i0)
+			hue = solfeggioHues[i0]*(1.0-mix) + solfeggioHues[i1]*mix
+
+		case "chakra":
+			cLen := float64(len(chakraHues))
+			cIdx := math.Mod(frac*cLen+state.Phase*2.0, cLen)
+			if cIdx < 0 {
+				cIdx += cLen
+			}
+			i0 := int(cIdx)
+			i1 := (i0 + 1) % len(chakraHues)
+			mix := cIdx - float64(i0)
+			hue = chakraHues[i0]*(1.0-mix) + chakraHues[i1]*mix
+
+		case "alchemical":
+			aLen := float64(len(alchemicalHues))
+			aIdx := math.Mod(frac*aLen+state.Phase*2.0, aLen)
+			if aIdx < 0 {
+				aIdx += aLen
+			}
+			i0 := int(aIdx)
+			i1 := (i0 + 1) % len(alchemicalHues)
+			mix := aIdx - float64(i0)
+			hue = alchemicalHues[i0]*(1.0-mix) + alchemicalHues[i1]*mix
+
+		case "golden_angle":
+			hue = math.Mod(35.0+float64(k)*137.507764+state.Phase*360.0, 360.0)
+
+		case "bioluminescent":
+			hue = 155.0 + math.Mod(frac+state.Phase, 1.0)*65.0
+
+		case "iridescent":
+			hue = math.Mod(180.0+120.0*math.Sin(2.0*math.Pi*(frac*3.0-state.Phase))+360.0, 360.0)
+
+		case "monochrome":
+			hue = 215.0
+			sat = 15.0
+			light = 65.0 + waveFactor*25.0
+
+		default: // "multivariate_facets" or "synesthesia"
+			hue = math.Mod(frac*360.0+state.Phase*360.0+state.HueOffset, 360.0)
+		}
+
+		if hue < 0 {
+			hue = math.Mod(hue+360.0, 360.0)
+		}
+
+		opacity := math.Max(0.18, math.Min(0.95, 0.55+waveFactor*0.35))
+		strokeCol := HSLToRGBA(hue, sat/100.0, light/100.0, uint8(opacity*255.0))
+		strokeWidth := math.Max(0.6, 1.0*(0.75+math.Abs(waveFactor)*0.45)*scaleFactor)
+
+		centerAngle := float64(k) * stepAngle
+		precessionAngle := float64(k) * missMarginRad
+
+		cx := centerX + (majR * math.Cos(centerAngle))
+		cy := centerY + (majR * math.Sin(centerAngle) * cosTilt)
+
+		const steps = 48
+		var firstX, firstY, prevX, prevY float64
+
+		for s := 0; s <= steps; s++ {
+			phi := (float64(s) / float64(steps)) * 2.0 * math.Pi
+			lx := minR * math.Cos(phi)
+			ly := minR * math.Sin(phi)
+
+			rx := lx*math.Cos(precessionAngle) - ly*math.Sin(precessionAngle)
+			ry := lx*math.Sin(precessionAngle) + ly*math.Cos(precessionAngle)
+
+			gx := cx + rx
+			gy := cy + (ry * cosTilt)
+
+			if s == 0 {
+				firstX, firstY = gx, gy
+				prevX, prevY = gx, gy
+			} else {
+				DrawLineAA(img, prevX, prevY, gx, gy, strokeCol, strokeWidth)
+				prevX, prevY = gx, gy
+			}
+		}
+		DrawLineAA(img, prevX, prevY, firstX, firstY, strokeCol, strokeWidth)
 	}
 
-	// Black Hole Event Horizon
-	drawFilledCircle(img, int(centerX), int(centerY), int(radius*0.26), color.RGBA{R: 0, G: 0, B: 0, A: 255})
+	// 4. Central Singularity Event Horizon Black Hole Void
+	innerHoleRadius := math.Abs(state.MajorRadius-state.MinorRadius) * scaleFactor
+	if innerHoleRadius > 4.0 {
+		voidStops := []GradientStop{
+			{Offset: 0.0, Color: color.RGBA{R: 0, G: 0, B: 0, A: 255}},
+			{Offset: 0.75, Color: color.RGBA{R: 0, G: 0, B: 0, A: 255}},
+			{Offset: 0.92, Color: color.RGBA{R: 2, G: 6, B: 23, A: 240}},
+			{Offset: 1.0, Color: color.RGBA{R: 2, G: 6, B: 23, A: 0}},
+		}
+		voidLUT := BuildGradientLUT(voidStops)
+		DrawRadialGlow(img, centerX, centerY, 0, innerHoleRadius, voidLUT, 1.0)
 
-	// Render Layered Objects (e.g. Āmra Mango fruit)
+		// Singularity Horizon perimeter glow ring
+		horizonHue := math.Mod(state.Phase*360.0, 360.0)
+		horizonCol := HSLToRGBA(horizonHue, 0.80, 0.65, 120)
+		const ringSteps = 60
+		for s := 0; s < ringSteps; s++ {
+			a1 := (float64(s) / float64(ringSteps)) * 2.0 * math.Pi
+			a2 := (float64(s+1) / float64(ringSteps)) * 2.0 * math.Pi
+			rx1 := centerX + innerHoleRadius*math.Cos(a1)
+			ry1 := centerY + innerHoleRadius*math.Sin(a1)*cosTilt
+			rx2 := centerX + innerHoleRadius*math.Cos(a2)
+			ry2 := centerY + innerHoleRadius*math.Sin(a2)*cosTilt
+			DrawLineAA(img, rx1, ry1, rx2, ry2, horizonCol, 0.8*scaleFactor)
+		}
+
+		// Central Divine Bindu (Pristine Starlight)
+		binduR := math.Max(1.5, 2.0*scaleFactor)
+		binduStops := []GradientStop{
+			{Offset: 0.0, Color: color.RGBA{R: 255, G: 255, B: 255, A: 255}},
+			{Offset: 0.6, Color: color.RGBA{R: 255, G: 255, B: 255, A: 220}},
+			{Offset: 1.0, Color: color.RGBA{R: 255, G: 255, B: 255, A: 0}},
+		}
+		binduLUT := BuildGradientLUT(binduStops)
+		DrawRadialGlow(img, centerX, centerY, 0, binduR, binduLUT, 1.0)
+	}
+
+	// 5. Layered Sacred Objects (e.g. Parametric Vedic Āmra Fruit)
 	for _, obj := range state.Objects {
-		if obj.ObjectID == "amra_fruit" && obj.Opacity > 0.05 {
+		if obj.ObjectID == "amra_fruit" && obj.Opacity > 0.02 {
 			prana := 1.0 + math.Sin(state.TimeSec*1.8*obj.PranaRate)*0.045
-			fruitR := radius * 0.28 * obj.Scale * prana
+			objScale := obj.Scale * prana * scaleFactor
 
-			fruitCol := color.RGBA{R: 245, G: 158, B: 11, A: uint8(obj.Opacity * 240)}
-			bijaCol := color.RGBA{R: 255, G: 255, B: 255, A: uint8(obj.Opacity * 250)}
+			ox := centerX + obj.X*scaleFactor
+			oy := centerY + obj.Y*scaleFactor
 
-			drawFilledCircle(img, int(centerX+obj.X), int(centerY+obj.Y), int(fruitR), fruitCol)
-			drawFilledCircle(img, int(centerX+obj.X), int(centerY+obj.Y), int(fruitR*0.35), bijaCol)
+			t1 := GetTheme(obj.ThemeID)
+			t2 := GetTheme(obj.NextThemeID)
+			theme := InterpolateTheme(t1, t2, obj.ThemeFactor)
+
+			belly := obj.Belly
+			if belly <= 0 {
+				belly = 125.0
+			}
+			hook := obj.Hook
+			if hook <= 0 {
+				hook = 35.0
+			}
+
+			// 5.1 Prāṇa Radiance Aura Halo
+			auraR := belly * 1.5 * objScale
+			auraStops := []GradientStop{
+				{Offset: 0.0, Color: theme.AuraGlow},
+				{Offset: 0.5, Color: theme.AuraGlow},
+				{Offset: 1.0, Color: color.RGBA{R: theme.AuraGlow.R, G: theme.AuraGlow.G, B: theme.AuraGlow.B, A: 0}},
+			}
+			auraLUT := BuildGradientLUT(auraStops)
+			DrawRadialGlow(img, ox, oy, 0, auraR, auraLUT, obj.Opacity)
+
+			// 5.2 Sacred Mango Leaves (Āmra-Pallava)
+			stemY := oy - (belly*1.4*0.82-30.0)*objScale
+			leaves := ComputeParametricLeaves(Point2D{X: ox, Y: stemY}, objScale)
+			for _, leaf := range leaves {
+				FillPolygonSolid(img, leaf, theme.LeafFill)
+				for li := 0; li < len(leaf)-1; li++ {
+					DrawLineAA(img, leaf[li].X, leaf[li].Y, leaf[li+1].X, leaf[li+1].Y, theme.LeafStroke, 1.0*scaleFactor)
+				}
+			}
+
+			// 5.3 Parametric Fruit Body
+			bodyPoints := ComputeParametricKairiCurve(ox, oy, objScale, belly, belly*1.4, 0.35, 0.22, hook, 30.0, 120)
+
+			bodyStops := []GradientStop{
+				{Offset: 0.0, Color: theme.BodyStops[0]},
+				{Offset: 0.40, Color: theme.BodyStops[1]},
+				{Offset: 0.78, Color: theme.BodyStops[2]},
+				{Offset: 1.0, Color: theme.BodyStops[3]},
+			}
+			bodyLUT := BuildGradientLUT(bodyStops)
+			gradCenterX := ox - 12.0*objScale
+			gradCenterY := oy + 12.0*objScale
+			FillPolygonRadial(img, bodyPoints, gradCenterX, gradCenterY, belly*1.6*objScale, bodyLUT, obj.Opacity)
+
+			// Perimeter Stroke
+			for pi := 0; pi < len(bodyPoints)-1; pi++ {
+				DrawLineAA(img, bodyPoints[pi].X, bodyPoints[pi].Y, bodyPoints[pi+1].X, bodyPoints[pi+1].Y, theme.StrokeColor, 1.8*scaleFactor)
+			}
+
+			// 5.4 Inner Indestructible Bīja Seed
+			rxBija := belly * 0.38
+			ryBija := belly * 1.4 * 0.42
+			bijaPoints := ComputeParametricKairiCurve(ox, oy, objScale*0.72, rxBija, ryBija, 0.18, 0.10, hook*0.3, 25.0, 80)
+
+			bijaStops := []GradientStop{
+				{Offset: 0.0, Color: theme.BijaStops[0]},
+				{Offset: 0.35, Color: theme.BijaStops[1]},
+				{Offset: 0.75, Color: theme.BijaStops[2]},
+				{Offset: 1.0, Color: theme.BijaStops[3]},
+			}
+			bijaLUT := BuildGradientLUT(bijaStops)
+			FillPolygonRadial(img, bijaPoints, ox, oy+5.0*objScale, rxBija*1.5*objScale*0.72, bijaLUT, obj.Opacity)
+
+			for bi := 0; bi < len(bijaPoints)-1; bi++ {
+				DrawLineAA(img, bijaPoints[bi].X, bijaPoints[bi].Y, bijaPoints[bi+1].X, bijaPoints[bi+1].Y, theme.BijaStroke, 1.2*scaleFactor)
+			}
 		}
 	}
 }

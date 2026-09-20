@@ -6,11 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
-	"image/color"
-	"image/draw"
 	"image/jpeg"
 	"log"
-	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -154,114 +151,9 @@ func (s *LiveStreamer) streamMJPEG(ctx context.Context, w http.ResponseWriter, m
 	}
 }
 
-// renderPreviewFrame generates a fast raster preview image representing the composited state.
+// renderPreviewFrame generates a high-fidelity raster preview image representing the composited state.
 func (s *LiveStreamer) renderPreviewFrame(w, h int, frame *CompiledFrameState) image.Image {
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
-
-	// Background fill
-	bgCol := color.RGBA{R: 2, G: 6, B: 23, A: 255} // Obsidian Void
-	switch frame.BackdropStyle {
-	case "cosmic_aurora":
-		bgCol = color.RGBA{R: 22, G: 11, B: 42, A: 255}
-	case "emerald_matrix":
-		bgCol = color.RGBA{R: 4, G: 32, B: 24, A: 255}
-	case "solar_corona":
-		bgCol = color.RGBA{R: 40, G: 14, B: 0, A: 255}
-	}
-	draw.Draw(img, img.Bounds(), &image.Uniform{C: bgCol}, image.Point{}, draw.Src)
-
-	centerX := float64(w) / 2
-	centerY := float64(h) / 2
-	radius := float64(h) * 0.38
-
-	// Draw Toroidal Harmonics representation
-	lines := 36
-	for i := 0; i < lines; i++ {
-		angle := (float64(i)/float64(lines))*2*math.Pi + frame.Phase*2*math.Pi
-		cx := centerX + math.Cos(angle)*(radius*0.4)
-		cy := centerY + math.Sin(angle)*(radius*0.25)
-		ringR := radius * 0.55
-
-		// Dynamic Hue
-		hue := math.Mod(float64(i*10)+frame.HueOffset+frame.Phase*360.0, 360.0)
-		r, g, b := hslToRgb(hue, 0.85, 0.55)
-		strokeCol := color.RGBA{R: r, G: g, B: b, A: 160}
-
-		drawCircleRing(img, int(cx), int(cy), int(ringR), strokeCol)
-	}
-
-	// Draw Center Black Hole Void
-	drawFilledCircle(img, int(centerX), int(centerY), int(radius*0.25), color.RGBA{R: 0, G: 0, B: 0, A: 255})
-
-	// Draw Sacred Objects (e.g. Āmra Mango fruit pulse representation)
-	for _, obj := range frame.Objects {
-		if obj.ObjectID == "amra_fruit" && obj.Opacity > 0.05 {
-			objScale := obj.Scale * (1.0 + math.Sin(frame.TimeSec*1.8*obj.PranaRate)*0.04)
-			fruitR := radius * 0.28 * objScale
-			fruitCol := color.RGBA{R: 245, G: 158, B: 11, A: uint8(obj.Opacity * 220)} // Saffron gold
-
-			drawFilledCircle(img, int(centerX+obj.X), int(centerY+obj.Y), int(fruitR), fruitCol)
-			drawFilledCircle(img, int(centerX+obj.X), int(centerY+obj.Y), int(fruitR*0.35), color.RGBA{R: 255, G: 255, B: 255, A: uint8(obj.Opacity * 240)})
-		}
-	}
-
+	RenderFrameRGBA(img, w, h, frame)
 	return img
-}
-
-func drawCircleRing(img *image.RGBA, cx, cy, r int, col color.RGBA) {
-	steps := 48
-	for i := 0; i < steps; i++ {
-		theta := (float64(i) / float64(steps)) * 2 * math.Pi
-		x := cx + int(float64(r)*math.Cos(theta))
-		y := cy + int(float64(r)*math.Sin(theta))
-		if x >= 0 && x < img.Bounds().Dx() && y >= 0 && y < img.Bounds().Dy() {
-			img.SetRGBA(x, y, col)
-		}
-	}
-}
-
-func drawFilledCircle(img *image.RGBA, cx, cy, r int, col color.RGBA) {
-	minX := max(0, cx-r)
-	maxX := min(img.Bounds().Dx()-1, cx+r)
-	minY := max(0, cy-r)
-	maxY := min(img.Bounds().Dy()-1, cy+r)
-
-	r2 := r * r
-	for y := minY; y <= maxY; y++ {
-		dy := y - cy
-		for x := minX; x <= maxX; x++ {
-			dx := x - cx
-			if dx*dx+dy*dy <= r2 {
-				img.SetRGBA(x, y, col)
-			}
-		}
-	}
-}
-
-func hslToRgb(h, s, l float64) (uint8, uint8, uint8) {
-	h = math.Mod(h, 360.0)
-	if h < 0 {
-		h += 360.0
-	}
-	c := (1 - math.Abs(2*l-1)) * s
-	x := c * (1 - math.Abs(math.Mod(h/60.0, 2)-1))
-	m := l - c/2
-
-	var rPrime, gPrime, bPrime float64
-	switch {
-	case h < 60:
-		rPrime, gPrime, bPrime = c, x, 0
-	case h < 120:
-		rPrime, gPrime, bPrime = x, c, 0
-	case h < 180:
-		rPrime, gPrime, bPrime = 0, c, x
-	case h < 240:
-		rPrime, gPrime, bPrime = 0, x, c
-	case h < 300:
-		rPrime, gPrime, bPrime = x, 0, c
-	default:
-		rPrime, gPrime, bPrime = c, 0, x
-	}
-
-	return uint8((rPrime + m) * 255), uint8((gPrime + m) * 255), uint8((bPrime + m) * 255)
 }

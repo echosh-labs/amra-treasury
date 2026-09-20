@@ -2,6 +2,7 @@ package studio
 
 import (
 	"context"
+	"image"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -114,3 +115,61 @@ func TestLiveStreamer_EphemeralMJPEG(t *testing.T) {
 		t.Errorf("expected multipart/x-mixed-replace, got %s", contentType)
 	}
 }
+
+func TestRenderFrameRGBA_FidelityAndBackdrops(t *testing.T) {
+	m := &StudioTimelineManifest{Title: "Fidelity Test"}
+	m.EnsureDefaults()
+	compiler := NewTimelineCompiler()
+
+	backdrops := []string{"cosmic_aurora", "emerald_matrix", "solar_corona", "obsidian"}
+	palettes := []string{"multivariate_facets", "solfeggio", "chakra", "alchemical", "golden_angle", "bioluminescent", "iridescent", "monochrome"}
+
+	for _, bd := range backdrops {
+		for _, pal := range palettes {
+			m.Background.BackdropStyle = bd
+			m.Background.Palette = pal
+
+			state := compiler.Evaluate(m, 15.0)
+			img := image.NewRGBA(image.Rect(0, 0, 480, 270))
+
+			RenderFrameRGBA(img, 480, 270, state)
+
+			// Check that frame is non-empty
+			var nonZeroCount int
+			for i := 0; i < len(img.Pix); i += 4 {
+				if img.Pix[i] > 0 || img.Pix[i+1] > 0 || img.Pix[i+2] > 0 {
+					nonZeroCount++
+				}
+			}
+			if nonZeroCount < 1000 {
+				t.Errorf("frame for backdrop %s and palette %s was unexpectedly empty", bd, pal)
+			}
+		}
+	}
+}
+
+func TestThemeInterpolation(t *testing.T) {
+	t1 := GetTheme("aama_emerald")
+	t2 := GetTheme("pakva_gold")
+
+	mid := InterpolateTheme(t1, t2, 0.5)
+
+	if mid.BodyStops[0].R == t1.BodyStops[0].R && mid.BodyStops[0].R == t2.BodyStops[0].R {
+		t.Errorf("expected interpolated color, got static value")
+	}
+}
+
+func BenchmarkRenderFrameRGBA_720p(b *testing.B) {
+	m := &StudioTimelineManifest{Title: "Bench"}
+	m.EnsureDefaults()
+	compiler := NewTimelineCompiler()
+	state := compiler.Evaluate(m, 15.0)
+
+	img := image.NewRGBA(image.Rect(0, 0, 1280, 720))
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		RenderFrameRGBA(img, 1280, 720, state)
+	}
+}
+
