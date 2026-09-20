@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/echosh-labs/amra-treasury/internal/db"
@@ -408,6 +409,17 @@ func (h *Handler) ToroidStreamHandler(w http.ResponseWriter, r *http.Request) {
 		palette = "solfeggio"
 	}
 
+	var customColors []string
+	if colorsParam := q.Get("colors"); colorsParam != "" {
+		raw := strings.Split(colorsParam, ",")
+		for _, c := range raw {
+			trimmed := strings.TrimSpace(c)
+			if trimmed != "" {
+				customColors = append(customColors, trimmed)
+			}
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -427,7 +439,7 @@ func (h *Handler) ToroidStreamHandler(w http.ResponseWriter, r *http.Request) {
 		case now := <-ticker.C:
 			frameIdx++
 			tSec := now.Sub(start).Seconds()
-			frame := ComputeContinuousHarmonicFrame(lineCount, tSec, waveMode, multiplier, palette, frameIdx)
+			frame := ComputeContinuousHarmonicFrame(lineCount, tSec, waveMode, multiplier, palette, frameIdx, customColors...)
 			data, err := json.Marshal(frame)
 			if err != nil {
 				continue

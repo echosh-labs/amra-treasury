@@ -3,6 +3,7 @@ package amra
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -306,6 +307,83 @@ var solfeggioBase = []struct {
 	{963, 320},
 }
 
+var chakraBase = []struct {
+	Name string
+	Hue  float64
+}{
+	{"Muladhara", 0},     // Root (Red)
+	{"Svadhisthana", 24},  // Sacral (Orange)
+	{"Manipura", 50},      // Solar Plexus (Gold/Yellow)
+	{"Anahata", 155},      // Heart (Emerald)
+	{"Vishuddha", 190},    // Throat (Cyan)
+	{"Ajna", 240},         // Third Eye (Indigo)
+	{"Sahasrara", 280},    // Crown (Violet)
+}
+
+var alchemicalBase = []struct {
+	Name string
+	Hue  float64
+}{
+	{"Aurum_Gold", 42},
+	{"Argentum_Silver", 210},
+	{"Cuprum_Copper", 28},
+	{"Ferrum_Iron", 220},
+	{"Hydrargyrum_Quicksilver", 195},
+	{"Aether_Violet", 270},
+}
+
+// HexToRGB parses a hex color string (#RGB or #RRGGBB) to 0.0-1.0 float RGB values.
+func HexToRGB(hex string) (r, g, b float64) {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) == 3 {
+		hex = string([]byte{hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]})
+	}
+	if len(hex) != 6 {
+		return 0.8, 0.8, 0.9 // fallback light slate
+	}
+	val, err := strconv.ParseUint(hex, 16, 32)
+	if err != nil {
+		return 0.8, 0.8, 0.9
+	}
+	r = float64((val>>16)&0xFF) / 255.0
+	g = float64((val>>8)&0xFF) / 255.0
+	b = float64(val&0xFF) / 255.0
+	return
+}
+
+// RGBToHSL converts float RGB (0-1) to HSL (H: 0-360, S: 0-100, L: 0-100).
+func RGBToHSL(r, g, b float64) (h, s, l float64) {
+	max := math.Max(r, math.Max(g, b))
+	min := math.Min(r, math.Min(g, b))
+	delta := max - min
+	l = (max + min) / 2.0
+
+	if delta == 0 {
+		return 0, 0, l * 100.0
+	}
+
+	if l < 0.5 {
+		s = delta / (max + min)
+	} else {
+		s = delta / (2.0 - max - min)
+	}
+
+	if max == r {
+		h = (g - b) / delta
+		if g < b {
+			h += 6.0
+		}
+	} else if max == g {
+		h = (b-r)/delta + 2.0
+	} else {
+		h = (r-g)/delta + 4.0
+	}
+	h *= 60.0
+	s *= 100.0
+	l *= 100.0
+	return
+}
+
 // ComputeContinuousHarmonicFrame generates mathematical frequency states for N lines at continuous time tSec.
 func ComputeContinuousHarmonicFrame(
 	lineCount int,
@@ -314,6 +392,7 @@ func ComputeContinuousHarmonicFrame(
 	multiplier int,
 	palette string,
 	frameIdx int64,
+	customColors ...string,
 ) ContinuousHarmonicFrame {
 	if lineCount < 12 {
 		lineCount = 108
@@ -325,6 +404,17 @@ func ComputeContinuousHarmonicFrame(
 	phase := math.Mod(tSec*0.125, 1.0) // Continuous 8-second base cycle without discontinuities
 	if phase < 0 {
 		phase += 1.0
+	}
+
+	// Pre-parse custom colors if provided
+	parsedCustom := make([]struct{ r, g, b, h, s, l float64 }, 0, len(customColors))
+	for _, c := range customColors {
+		trimmed := strings.TrimSpace(c)
+		if trimmed != "" {
+			cr, cg, cb := HexToRGB(trimmed)
+			ch, cs, cl := RGBToHSL(cr, cg, cb)
+			parsedCustom = append(parsedCustom, struct{ r, g, b, h, s, l float64 }{cr, cg, cb, ch, cs, cl})
+		}
 	}
 
 	lineStates := make([]HarmonicLineState, lineCount)
@@ -360,6 +450,32 @@ func ComputeContinuousHarmonicFrame(
 			sat = 90.0
 			light = 50.0 + waveFactor*18.0
 
+		case "chakra":
+			chkLen := float64(len(chakraBase))
+			cIdx := math.Mod(frac*chkLen+phase*2.0, chkLen)
+			if cIdx < 0 {
+				cIdx += chkLen
+			}
+			i0 := int(cIdx)
+			i1 := (i0 + 1) % len(chakraBase)
+			mix := cIdx - float64(i0)
+			hue = chakraBase[i0].Hue*(1.0-mix) + chakraBase[i1].Hue*mix
+			sat = 92.0
+			light = 52.0 + waveFactor*16.0
+
+		case "alchemical":
+			alcLen := float64(len(alchemicalBase))
+			aIdx := math.Mod(frac*alcLen+phase*2.0, alcLen)
+			if aIdx < 0 {
+				aIdx += alcLen
+			}
+			i0 := int(aIdx)
+			i1 := (i0 + 1) % len(alchemicalBase)
+			mix := aIdx - float64(i0)
+			hue = alchemicalBase[i0].Hue*(1.0-mix) + alchemicalBase[i1].Hue*mix
+			sat = 88.0
+			light = 54.0 + waveFactor*18.0
+
 		case "pythagorean":
 			pythSteps := (k * 7) % 12
 			hue = math.Mod((float64(pythSteps)/12.0)*360.0+phase*180.0, 360.0)
@@ -376,10 +492,91 @@ func ComputeContinuousHarmonicFrame(
 			sat = 95.0
 			light = 58.0 + waveFactor*20.0
 
+		case "golden_angle":
+			// 137.507764° Golden Angle phyllotaxis stepping
+			baseH := 35.0 // Warm solar default
+			if len(parsedCustom) > 0 {
+				baseH = parsedCustom[0].h
+			}
+			hue = math.Mod(baseH+float64(k)*137.507764+phase*360.0, 360.0)
+			if hue < 0 {
+				hue += 360.0
+			}
+			sat = 90.0
+			light = 52.0 + waveFactor*18.0
+
+		case "iridescent":
+			// Thin-film optical interference
+			baseH := 180.0
+			if len(parsedCustom) > 0 {
+				baseH = parsedCustom[0].h
+			}
+			hue = math.Mod(baseH+120.0*math.Sin(2.0*math.Pi*(frac*3.0-phase))+360.0, 360.0)
+			sat = 95.0
+			light = 55.0 + waveFactor*20.0
+
+		case "dual_zone":
+			// Core vs Perimeter blend
+			h0, s0 := 40.0, 90.0
+			h1, s1 := 200.0, 85.0
+			if len(parsedCustom) >= 2 {
+				h0, s0 = parsedCustom[0].h, parsedCustom[0].s
+				h1, s1 = parsedCustom[1].h, parsedCustom[1].s
+			} else if len(parsedCustom) == 1 {
+				h0, s0 = parsedCustom[0].h, parsedCustom[0].s
+			}
+			// Falloff along radius fraction
+			blend := math.Sin(frac * math.Pi * 0.5)
+			hue = math.Mod(h0*(1.0-blend)+h1*blend+phase*60.0, 360.0)
+			sat = s0*(1.0-blend) + s1*blend
+			light = 50.0 + waveFactor*18.0
+
+		case "solid_tint":
+			if len(parsedCustom) > 0 {
+				hue = parsedCustom[0].h
+				sat = parsedCustom[0].s
+				light = math.Min(90.0, math.Max(20.0, parsedCustom[0].l+waveFactor*18.0))
+			} else {
+				hue = 210.0
+				sat = 75.0
+				light = 55.0 + waveFactor*20.0
+			}
+
+		case "custom_spectrum":
+			if len(parsedCustom) >= 2 {
+				numStops := float64(len(parsedCustom))
+				pos := math.Mod(frac*numStops+phase*float64(multiplier), numStops)
+				if pos < 0 {
+					pos += numStops
+				}
+				i0 := int(pos)
+				i1 := (i0 + 1) % len(parsedCustom)
+				t := pos - float64(i0)
+
+				// Direct RGB interpolation then convert to HSL for uniform brightness
+				ir := parsedCustom[i0].r*(1.0-t) + parsedCustom[i1].r*t
+				ig := parsedCustom[i0].g*(1.0-t) + parsedCustom[i1].g*t
+				ib := parsedCustom[i0].b*(1.0-t) + parsedCustom[i1].b*t
+				hue, sat, light = RGBToHSL(ir, ig, ib)
+				light = math.Min(90.0, math.Max(20.0, light+waveFactor*15.0))
+			} else if len(parsedCustom) == 1 {
+				hue = parsedCustom[0].h
+				sat = parsedCustom[0].s
+				light = math.Min(90.0, math.Max(20.0, parsedCustom[0].l+waveFactor*18.0))
+			} else {
+				hue = math.Mod(frac*360.0+phase*360.0, 360.0)
+				sat = 90.0
+				light = 52.0 + waveFactor*18.0
+			}
+
 		default: // "monochrome"
 			hue = 215.0
 			sat = 15.0
 			light = 65.0 + waveFactor*25.0
+		}
+
+		if hue < 0 {
+			hue = math.Mod(hue+360.0, 360.0)
 		}
 
 		opacity := 0.20 + (waveFactor+1.0)*0.38
