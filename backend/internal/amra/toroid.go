@@ -542,6 +542,21 @@ func ComputeContinuousHarmonicFrame(
 				light = 55.0 + waveFactor*20.0
 			}
 
+		case "multivariate_facets":
+			if len(parsedCustom) > 0 {
+				facetIdx := k % len(parsedCustom)
+				targetFacet := parsedCustom[facetIdx]
+				facetPhase := float64(facetIdx) / float64(len(parsedCustom))
+				fw := math.Sin(2*math.Pi*(frac*float64(multiplier) - phase + facetPhase))
+				hue = targetFacet.h
+				sat = targetFacet.s
+				light = math.Min(92.0, math.Max(18.0, targetFacet.l+fw*18.0))
+			} else {
+				hue = math.Mod(frac*360.0+phase*360.0, 360.0)
+				sat = 90.0
+				light = 55.0 + waveFactor*18.0
+			}
+
 		case "custom_spectrum":
 			if len(parsedCustom) >= 2 {
 				numStops := float64(len(parsedCustom))

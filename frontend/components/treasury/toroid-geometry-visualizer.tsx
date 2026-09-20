@@ -42,6 +42,7 @@ interface ToroidGeometryVisualizerProps {
 }
 
 export type HarmonicColorPalette =
+  | "multivariate_facets"
   | "solfeggio"
   | "pythagorean"
   | "synesthesia"
@@ -55,55 +56,65 @@ export type HarmonicColorPalette =
   | "solid_tint"
   | "custom_spectrum";
 
-export interface ColorSwatchItem {
+export type FacetDistributionMode =
+  | "interlaced_weave"
+  | "radial_octaves"
+  | "interference_blend";
+
+export interface MultivariateFacet {
+  id: string;
   name: string;
-  hex: string;
   category: "chakra" | "alchemical" | "singularity" | "neon";
+  coreHex: string;         // Primary base hue
+  accentHex: string;       // Harmonic overtone / tint
+  causticHex: string;      // Inter-filament caustic glow
+  frequencyHz: number;     // Harmonic acoustic station (Hz)
+  modulationPhase: number; // Phase offset factor (0.0 to 1.0)
   meaning: string;
 }
 
-export const CHAKRA_SWATCHES: ColorSwatchItem[] = [
-  { name: "Mūlādhāra", hex: "#E11D48", category: "chakra", meaning: "Root / Grounding Ruby" },
-  { name: "Svādhiṣṭhāna", hex: "#EA580C", category: "chakra", meaning: "Sacral / Pranic Orange" },
-  { name: "Maṇipūra", hex: "#EAB308", category: "chakra", meaning: "Solar Plexus / Will Fire" },
-  { name: "Anāhata", hex: "#10B981", category: "chakra", meaning: "Heart / Cosmic Love" },
-  { name: "Viśuddha", hex: "#06B6D4", category: "chakra", meaning: "Throat / Sacred Akasha" },
-  { name: "Ājñā", hex: "#6366F1", category: "chakra", meaning: "Third Eye / Intuition" },
-  { name: "Sahasrāra", hex: "#A855F7", category: "chakra", meaning: "Crown / Transcendence" },
+export const CHAKRA_FACETS: MultivariateFacet[] = [
+  { id: "chakra_muladhara", name: "Mūlādhāra", category: "chakra", coreHex: "#E11D48", accentHex: "#FB7185", causticHex: "#9F1239", frequencyHz: 174, modulationPhase: 0.0, meaning: "Root / Grounding Ruby" },
+  { id: "chakra_svadhisthana", name: "Svādhiṣṭhāna", category: "chakra", coreHex: "#EA580C", accentHex: "#FB923C", causticHex: "#C2410C", frequencyHz: 285, modulationPhase: 0.14, meaning: "Sacral / Pranic Fire" },
+  { id: "chakra_manipura", name: "Maṇipūra", category: "chakra", coreHex: "#EAB308", accentHex: "#FDE047", causticHex: "#CA8A04", frequencyHz: 396, modulationPhase: 0.28, meaning: "Solar Plexus / Will Aurum" },
+  { id: "chakra_anahata", name: "Anāhata", category: "chakra", coreHex: "#10B981", accentHex: "#34D399", causticHex: "#047857", frequencyHz: 528, modulationPhase: 0.42, meaning: "Heart / Cosmic Miracle" },
+  { id: "chakra_vishuddha", name: "Viśuddha", category: "chakra", coreHex: "#06B6D4", accentHex: "#38BDF8", causticHex: "#0891B2", frequencyHz: 639, modulationPhase: 0.57, meaning: "Throat / Sacred Akasha" },
+  { id: "chakra_ajna", name: "Ājñā", category: "chakra", coreHex: "#6366F1", accentHex: "#818CF8", causticHex: "#4338CA", frequencyHz: 741, modulationPhase: 0.71, meaning: "Third Eye / Intuitive Indigo" },
+  { id: "chakra_sahasrara", name: "Sahasrāra", category: "chakra", coreHex: "#A855F7", accentHex: "#C084FC", causticHex: "#7E22CE", frequencyHz: 963, modulationPhase: 0.85, meaning: "Crown / Transcendent Void" },
 ];
 
-export const ALCHEMICAL_SWATCHES: ColorSwatchItem[] = [
-  { name: "Aurum", hex: "#F59E0B", category: "alchemical", meaning: "Philosopher's Gold" },
-  { name: "Argentum", hex: "#E2E8F0", category: "alchemical", meaning: "Lunar Silver" },
-  { name: "Cuprum", hex: "#B45309", category: "alchemical", meaning: "Venusian Copper" },
-  { name: "Ferrum", hex: "#475569", category: "alchemical", meaning: "Martian Iron" },
-  { name: "Hydrargyrum", hex: "#38BDF8", category: "alchemical", meaning: "Hermetic Quicksilver" },
-  { name: "Aetherium", hex: "#C084FC", category: "alchemical", meaning: "Quintessence Violet" },
+export const ALCHEMICAL_FACETS: MultivariateFacet[] = [
+  { id: "alc_aurum", name: "Aurum", category: "alchemical", coreHex: "#F59E0B", accentHex: "#FEF08A", causticHex: "#D97706", frequencyHz: 432, modulationPhase: 0.0, meaning: "Philosopher's Gold" },
+  { id: "alc_argentum", name: "Argentum", category: "alchemical", coreHex: "#E2E8F0", accentHex: "#FFFFFF", causticHex: "#94A3B8", frequencyHz: 586, modulationPhase: 0.16, meaning: "Lunar Reflective Silver" },
+  { id: "alc_cuprum", name: "Cuprum", category: "alchemical", coreHex: "#B45309", accentHex: "#FDBA74", causticHex: "#92400E", frequencyHz: 324, modulationPhase: 0.33, meaning: "Venusian Resonant Copper" },
+  { id: "alc_ferrum", name: "Ferrum", category: "alchemical", coreHex: "#475569", accentHex: "#94A3B8", causticHex: "#1E293B", frequencyHz: 216, modulationPhase: 0.50, meaning: "Martian Telluric Iron" },
+  { id: "alc_hydrargyrum", name: "Hydrargyrum", category: "alchemical", coreHex: "#38BDF8", accentHex: "#7DD3FC", causticHex: "#0284C7", frequencyHz: 648, modulationPhase: 0.66, meaning: "Hermetic Fluid Quicksilver" },
+  { id: "alc_aetherium", name: "Aetherium", category: "alchemical", coreHex: "#C084FC", accentHex: "#E9D5FF", causticHex: "#9333EA", frequencyHz: 864, modulationPhase: 0.83, meaning: "Quintessence Aether Void" },
 ];
 
-export const SINGULARITY_SWATCHES: ColorSwatchItem[] = [
-  { name: "Singularity Void", hex: "#020617", category: "singularity", meaning: "Absolute Black Hole Core" },
-  { name: "Event Horizon", hex: "#FBBF24", category: "singularity", meaning: "Photon Sphere Amber" },
-  { name: "Accretion Disk", hex: "#DC2626", category: "singularity", meaning: "Relativistic Doppler Red" },
-  { name: "Relativistic Jet", hex: "#2563EB", category: "singularity", meaning: "Synchrotron Plasma Blue" },
-  { name: "Hawking Glow", hex: "#22D3EE", category: "singularity", meaning: "Quantum Evaporation Cyan" },
-  { name: "Supernova Peak", hex: "#FFFFFF", category: "singularity", meaning: "Zero-Point Pure White" },
+export const SINGULARITY_FACETS: MultivariateFacet[] = [
+  { id: "sing_void", name: "Singularity Void", category: "singularity", coreHex: "#020617", accentHex: "#1E293B", causticHex: "#0F172A", frequencyHz: 108, modulationPhase: 0.0, meaning: "Black Hole Event Singularity" },
+  { id: "sing_horizon", name: "Event Horizon", category: "singularity", coreHex: "#FBBF24", accentHex: "#FEF3C7", causticHex: "#B45309", frequencyHz: 480, modulationPhase: 0.16, meaning: "Photon Sphere Amber" },
+  { id: "sing_accretion", name: "Accretion Disk", category: "singularity", coreHex: "#DC2626", accentHex: "#F87171", causticHex: "#991B1B", frequencyHz: 256, modulationPhase: 0.33, meaning: "Relativistic Doppler Red" },
+  { id: "sing_jet", name: "Relativistic Jet", category: "singularity", coreHex: "#2563EB", accentHex: "#60A5FA", causticHex: "#1D4ED8", frequencyHz: 720, modulationPhase: 0.50, meaning: "Synchrotron Relativistic Jet" },
+  { id: "sing_hawking", name: "Hawking Glow", category: "singularity", coreHex: "#22D3EE", accentHex: "#A5F3FC", causticHex: "#0E7490", frequencyHz: 888, modulationPhase: 0.66, meaning: "Quantum Evaporation Glow" },
+  { id: "sing_supernova", name: "Supernova Peak", category: "singularity", coreHex: "#FFFFFF", accentHex: "#F1F5F9", causticHex: "#CBD5E1", frequencyHz: 999, modulationPhase: 0.83, meaning: "Zero-Point Cosmic Flash" },
 ];
 
-export const NEON_SWATCHES: ColorSwatchItem[] = [
-  { name: "Laser Rose", hex: "#F43F5E", category: "neon", meaning: "520nm Neon Coral" },
-  { name: "Solar Flare", hex: "#FB923C", category: "neon", meaning: "Chromosphere Orange" },
-  { name: "Acid Lime", hex: "#84CC16", category: "neon", meaning: "Bioluminescent Spore" },
-  { name: "Emerald Ray", hex: "#10B981", category: "neon", meaning: "Coherent Emerald Laser" },
-  { name: "Cyber Teal", hex: "#06B6D4", category: "neon", meaning: "High-Frequency Plasma" },
-  { name: "Hyper Violet", hex: "#8B5CF6", category: "neon", meaning: "Deep Resonance Ultraviolet" },
+export const NEON_FACETS: MultivariateFacet[] = [
+  { id: "neon_rose", name: "Laser Rose", category: "neon", coreHex: "#F43F5E", accentHex: "#FDA4AF", causticHex: "#BE123C", frequencyHz: 520, modulationPhase: 0.0, meaning: "520nm Coherent Neon Rose" },
+  { id: "neon_sunburst", name: "Solar Flare", category: "neon", coreHex: "#FB923C", accentHex: "#FED7AA", causticHex: "#EA580C", frequencyHz: 360, modulationPhase: 0.16, meaning: "Chromospheric Solar Flare" },
+  { id: "neon_lime", name: "Acid Lime", category: "neon", coreHex: "#84CC16", accentHex: "#BEF264", causticHex: "#65A30D", frequencyHz: 440, modulationPhase: 0.33, meaning: "Bioluminescent Spore Ray" },
+  { id: "neon_emerald", name: "Emerald Ray", category: "neon", coreHex: "#10B981", accentHex: "#6EE7B7", causticHex: "#047857", frequencyHz: 528, modulationPhase: 0.50, meaning: "Laser Harmonic Coherence" },
+  { id: "neon_teal", name: "Cyber Teal", category: "neon", coreHex: "#06B6D4", accentHex: "#67E8F9", causticHex: "#0E7490", frequencyHz: 672, modulationPhase: 0.66, meaning: "High-Frequency Cyber Plasma" },
+  { id: "neon_violet", name: "Hyper Violet", category: "neon", coreHex: "#8B5CF6", accentHex: "#C4B5FD", causticHex: "#6D28D9", frequencyHz: 816, modulationPhase: 0.83, meaning: "Deep Ultraviolet Resonance" },
 ];
 
-export const ALL_SWATCHES: ColorSwatchItem[] = [
-  ...CHAKRA_SWATCHES,
-  ...ALCHEMICAL_SWATCHES,
-  ...SINGULARITY_SWATCHES,
-  ...NEON_SWATCHES,
+export const ALL_FACETS: MultivariateFacet[] = [
+  ...CHAKRA_FACETS,
+  ...ALCHEMICAL_FACETS,
+  ...SINGULARITY_FACETS,
+  ...NEON_FACETS,
 ];
 
 export const GRADIENT_PRESETS = [
@@ -184,6 +195,18 @@ function hslToHex(h: number, s: number, l: number): string {
   return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
 }
 
+export interface CompiledFacet {
+  id: string;
+  name: string;
+  coreRgb: RGB;
+  accentRgb: RGB;
+  causticRgb: RGB;
+  coreHsl: HSL;
+  accentHsl: HSL;
+  frequencyHz: number;
+  modulationPhase: number;
+}
+
 export type WaveCirculationMode =
   | "orbital_swirl"
   | "singularity_ingestion"
@@ -208,14 +231,21 @@ export default function ToroidGeometryVisualizer({
   const [baseOpacity, setBaseOpacity] = useState<number>(0.75);
 
   // 2. Harmonic Frequency & Coloration State
-  const [palette, setPalette] = useState<HarmonicColorPalette>("solfeggio");
+  const [palette, setPalette] = useState<HarmonicColorPalette>("multivariate_facets");
   const [waveMode, setWaveMode] = useState<WaveCirculationMode>("orbital_swirl");
   const [harmonicMultiplier, setHarmonicMultiplier] = useState<number>(3); // 3-fold harmonic overtone
   const [spaceInterference, setSpaceInterference] = useState<number>(0.45); // Luminescence in spaces between lines
 
-  // Enhanced Color Selection Grid State
+  // Enhanced Color Selection Grid State & Multi-Facet Activation
   const [selectedHex, setSelectedHex] = useState<string>("#38BDF8");
   const [secondaryHex, setSecondaryHex] = useState<string>("#F59E0B");
+  const [activeFacetIds, setActiveFacetIds] = useState<string[]>([
+    "chakra_muladhara",
+    "chakra_anahata",
+    "chakra_sahasrara",
+  ]);
+  const [facetDistribution, setFacetDistribution] =
+    useState<FacetDistributionMode>("interlaced_weave");
   const [customSpectrumStops, setCustomSpectrumStops] = useState<string[]>([
     "#E11D48",
     "#F59E0B",
@@ -268,7 +298,7 @@ export default function ToroidGeometryVisualizer({
     flowDirection: 1,
     spaceInterference: 0.45,
     harmonicMultiplier: 3,
-    palette: "solfeggio" as HarmonicColorPalette,
+    palette: "multivariate_facets" as HarmonicColorPalette,
     waveMode: "orbital_swirl" as WaveCirculationMode,
     baseOpacity: 0.75,
     baseStrokeWidth: 1.0,
@@ -285,7 +315,50 @@ export default function ToroidGeometryVisualizer({
       { r: 6, g: 182, b: 212 },
       { r: 168, g: 85, b: 247 },
     ],
+    compiledFacets: [] as CompiledFacet[],
+    facetDistribution: "interlaced_weave" as FacetDistributionMode,
   });
+
+  // Multi-Facet toggle helpers
+  const toggleFacet = (id: string) => {
+    setActiveFacetIds((prev) => {
+      let next: string[];
+      if (prev.includes(id)) {
+        if (prev.length <= 1) {
+          toastError("At least 1 facet must remain active in the multi-facet matrix");
+          return prev;
+        }
+        next = prev.filter((item) => item !== id);
+      } else {
+        next = [...prev, id];
+      }
+      setPalette("multivariate_facets");
+      return next;
+    });
+  };
+
+  const soloFacet = (id: string) => {
+    setActiveFacetIds([id]);
+    const facet = ALL_FACETS.find((f) => f.id === id);
+    if (facet) {
+      setSelectedHex(facet.coreHex);
+      setSecondaryHex(facet.accentHex);
+    }
+    setPalette("multivariate_facets");
+    toastSuccess(`Soloing facet: ${facet?.name || id}`);
+  };
+
+  const selectFacetCluster = (category: "all" | "chakra" | "alchemical" | "singularity" | "neon") => {
+    if (category === "all") {
+      setActiveFacetIds(ALL_FACETS.map((f) => f.id));
+      toastSuccess(`Activated all ${ALL_FACETS.length} harmonic facets`);
+    } else {
+      const ids = ALL_FACETS.filter((f) => f.category === category).map((f) => f.id);
+      setActiveFacetIds(ids);
+      toastSuccess(`Activated ${ids.length} ${category} facets`);
+    }
+    setPalette("multivariate_facets");
+  };
 
   // Sync React props to mutable ref so the render loop always has latest settings without restart
   useEffect(() => {
@@ -294,6 +367,25 @@ export default function ToroidGeometryVisualizer({
     const sRgb = hexToRgb(secondaryHex);
     const sHsl = rgbToHsl(sRgb.r, sRgb.g, sRgb.b);
     const specRgb = customSpectrumStops.map((hex) => hexToRgb(hex));
+
+    const activeFacetsList = ALL_FACETS.filter((f) => activeFacetIds.includes(f.id));
+    const targetFacets = activeFacetsList.length > 0 ? activeFacetsList : [ALL_FACETS[0]];
+    const compiledFacets: CompiledFacet[] = targetFacets.map((f) => {
+      const cRgb = hexToRgb(f.coreHex);
+      const aRgb = hexToRgb(f.accentHex);
+      const kRgb = hexToRgb(f.causticHex);
+      return {
+        id: f.id,
+        name: f.name,
+        coreRgb: cRgb,
+        accentRgb: aRgb,
+        causticRgb: kRgb,
+        coreHsl: rgbToHsl(cRgb.r, cRgb.g, cRgb.b),
+        accentHsl: rgbToHsl(aRgb.r, aRgb.g, aRgb.b),
+        frequencyHz: f.frequencyHz,
+        modulationPhase: f.modulationPhase,
+      };
+    });
 
     engineStateRef.current.isPlaying = isPlaying;
     engineStateRef.current.speedMultiplier = speedMultiplier;
@@ -311,6 +403,8 @@ export default function ToroidGeometryVisualizer({
     engineStateRef.current.secondaryRgb = sRgb;
     engineStateRef.current.secondaryHsl = sHsl;
     engineStateRef.current.spectrumStopsRgb = specRgb;
+    engineStateRef.current.compiledFacets = compiledFacets;
+    engineStateRef.current.facetDistribution = facetDistribution;
   }, [
     isPlaying,
     speedMultiplier,
@@ -326,6 +420,8 @@ export default function ToroidGeometryVisualizer({
     selectedHex,
     secondaryHex,
     customSpectrumStops,
+    activeFacetIds,
+    facetDistribution,
   ]);
 
   // Solfeggio 9 Frequencies (Hz -> Hue)
@@ -407,7 +503,12 @@ export default function ToroidGeometryVisualizer({
     }
 
     const colorsParam =
-      palette === "custom_spectrum"
+      palette === "multivariate_facets"
+        ? activeFacetIds
+            .map((id) => ALL_FACETS.find((f) => f.id === id)?.coreHex)
+            .filter(Boolean)
+            .join(",")
+        : palette === "custom_spectrum"
         ? customSpectrumStops.join(",")
         : `${selectedHex},${secondaryHex}`;
 
@@ -456,6 +557,7 @@ export default function ToroidGeometryVisualizer({
     selectedHex,
     secondaryHex,
     customSpectrumStops,
+    activeFacetIds,
   ]);
 
   // Main Zero-Allocation Continuous Animation Loop
@@ -529,62 +631,139 @@ export default function ToroidGeometryVisualizer({
           );
           const interHue = Math.floor(((curPhase * 360) % 360 + 360) % 360);
 
-          causticGlow.addColorStop(0, "#000000");
-          causticGlow.addColorStop(
-            0.35,
-            state.palette === "monochrome"
-              ? `rgba(226, 232, 240, ${state.spaceInterference * 0.12})`
-              : `hsla(${interHue}, 90%, 55%, ${state.spaceInterference * 0.22})`
-          );
-          causticGlow.addColorStop(
-            0.75,
-            state.palette === "monochrome"
-              ? `rgba(148, 163, 184, ${state.spaceInterference * 0.08})`
-              : `hsla(${(interHue + 120) % 360}, 85%, 45%, ${state.spaceInterference * 0.15})`
-          );
-          causticGlow.addColorStop(1, "rgba(2, 6, 23, 0)");
+            causticGlow.addColorStop(0, "#000000");
 
-          ctx.fillStyle = causticGlow;
-          ctx.beginPath();
-          ctx.arc(0, 0, tData.outer_radius * 1.15, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-
-        // 3. Render Pre-compiled Filament Paths (Zero object allocations per frame)
-        const cachedPaths = pathCacheRef.current;
-        const totalLoops = cachedPaths.length > 0 ? cachedPaths.length : state.lineCount;
-
-        if (cachedPaths.length > 0 && state.mode !== "continuous") {
-          for (let i = 0; i < cachedPaths.length; i++) {
-            const frac = totalLoops > 0 ? i / totalLoops : 0;
-
-            // Wave modulation computation
-            let waveFactor = 0;
-            switch (state.waveMode) {
-              case "orbital_swirl":
-                waveFactor = Math.sin(2 * Math.PI * (frac * state.harmonicMultiplier - curPhase));
-                break;
-              case "singularity_ingestion":
-                waveFactor = Math.cos(2 * Math.PI * (frac * 2.0 + curPhase * state.harmonicMultiplier));
-                break;
-              case "standing_wave":
-                waveFactor =
-                  Math.sin(2 * Math.PI * frac * state.harmonicMultiplier) *
-                  Math.cos(2 * Math.PI * curPhase);
-                break;
-              case "doppler_vortex":
-                waveFactor = Math.sin(
-                  2 * Math.PI * (Math.pow(frac, 1.5) * state.harmonicMultiplier - curPhase)
-                );
-                break;
+            if (state.palette === "monochrome") {
+              causticGlow.addColorStop(0.35, `rgba(226, 232, 240, ${state.spaceInterference * 0.12})`);
+              causticGlow.addColorStop(0.75, `rgba(148, 163, 184, ${state.spaceInterference * 0.08})`);
+            } else if (state.palette === "multivariate_facets" && state.compiledFacets.length > 0) {
+              const fLen = state.compiledFacets.length;
+              let cR = 0, cG = 0, cB = 0;
+              for (let fi = 0; fi < fLen; fi++) {
+                cR += state.compiledFacets[fi].causticRgb.r;
+                cG += state.compiledFacets[fi].causticRgb.g;
+                cB += state.compiledFacets[fi].causticRgb.b;
+              }
+              cR = Math.round(cR / fLen);
+              cG = Math.round(cG / fLen);
+              cB = Math.round(cB / fLen);
+              const waveBoost = (Math.sin(2 * Math.PI * curPhase) + 1.0) * 0.5;
+              causticGlow.addColorStop(
+                0.35,
+                `rgba(${cR}, ${cG}, ${cB}, ${(state.spaceInterference * (0.2 + waveBoost * 0.15)).toFixed(3)})`
+              );
+              causticGlow.addColorStop(
+                0.75,
+                `rgba(${cR}, ${cG}, ${cB}, ${(state.spaceInterference * 0.08).toFixed(3)})`
+              );
+            } else {
+              const interHue = Math.floor(((curPhase * 360) % 360 + 360) % 360);
+              causticGlow.addColorStop(0.35, `hsla(${interHue}, 90%, 55%, ${state.spaceInterference * 0.22})`);
+              causticGlow.addColorStop(
+                0.75,
+                `hsla(${(interHue + 120) % 360}, 85%, 45%, ${state.spaceInterference * 0.15})`
+              );
             }
 
-            let hue = 0;
-            let saturation = 85;
-            let lightness = 55;
-            let customRgbStroke = "";
+            causticGlow.addColorStop(1, "rgba(2, 6, 23, 0)");
 
-            switch (state.palette) {
+            ctx.fillStyle = causticGlow;
+            ctx.beginPath();
+            ctx.arc(0, 0, tData.outer_radius * 1.15, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+
+          // 3. Render Pre-compiled Filament Paths (Zero object allocations per frame)
+          const cachedPaths = pathCacheRef.current;
+          const totalLoops = cachedPaths.length > 0 ? cachedPaths.length : state.lineCount;
+
+          if (cachedPaths.length > 0 && state.mode !== "continuous") {
+            for (let i = 0; i < cachedPaths.length; i++) {
+              const frac = totalLoops > 0 ? i / totalLoops : 0;
+
+              // Wave modulation computation
+              let waveFactor = 0;
+              switch (state.waveMode) {
+                case "orbital_swirl":
+                  waveFactor = Math.sin(2 * Math.PI * (frac * state.harmonicMultiplier - curPhase));
+                  break;
+                case "singularity_ingestion":
+                  waveFactor = Math.cos(2 * Math.PI * (frac * 2.0 + curPhase * state.harmonicMultiplier));
+                  break;
+                case "standing_wave":
+                  waveFactor =
+                    Math.sin(2 * Math.PI * frac * state.harmonicMultiplier) *
+                    Math.cos(2 * Math.PI * curPhase);
+                  break;
+                case "doppler_vortex":
+                  waveFactor = Math.sin(
+                    2 * Math.PI * (Math.pow(frac, 1.5) * state.harmonicMultiplier - curPhase)
+                  );
+                  break;
+              }
+
+              let hue = 0;
+              let saturation = 85;
+              let lightness = 55;
+              let customRgbStroke = "";
+
+              switch (state.palette) {
+                case "multivariate_facets": {
+                  const facets = state.compiledFacets;
+                  const fCount = facets.length;
+                  if (fCount > 0) {
+                    let f: CompiledFacet;
+                    let blendWeight = 0;
+                    let nextF: CompiledFacet | null = null;
+
+                    if (state.facetDistribution === "interlaced_weave") {
+                      f = facets[i % fCount];
+                    } else if (state.facetDistribution === "radial_octaves") {
+                      const sector = Math.floor(frac * fCount) % fCount;
+                      f = facets[sector];
+                    } else {
+                      // interference_blend
+                      const pos = Math.abs(
+                        (frac * fCount + curPhase * state.harmonicMultiplier) % fCount
+                      );
+                      const idx0 = Math.floor(pos);
+                      const idx1 = (idx0 + 1) % fCount;
+                      blendWeight = pos - idx0;
+                      f = facets[idx0];
+                      nextF = facets[idx1];
+                    }
+
+                    const fWave = Math.sin(
+                      2 * Math.PI * (frac * state.harmonicMultiplier - curPhase + f.modulationPhase)
+                    );
+                    const tColor = (fWave + 1.0) * 0.5;
+
+                    let r = f.coreRgb.r * (1.0 - tColor) + f.accentRgb.r * tColor;
+                    let g = f.coreRgb.g * (1.0 - tColor) + f.accentRgb.g * tColor;
+                    let b = f.coreRgb.b * (1.0 - tColor) + f.accentRgb.b * tColor;
+
+                    if (nextF && blendWeight > 0) {
+                      const r2 = nextF.coreRgb.r * (1.0 - tColor) + nextF.accentRgb.r * tColor;
+                      const g2 = nextF.coreRgb.g * (1.0 - tColor) + nextF.accentRgb.g * tColor;
+                      const b2 = nextF.coreRgb.b * (1.0 - tColor) + nextF.accentRgb.b * tColor;
+                      r = r * (1.0 - blendWeight) + r2 * blendWeight;
+                      g = g * (1.0 - blendWeight) + g2 * blendWeight;
+                      b = b * (1.0 - blendWeight) + b2 * blendWeight;
+                    }
+
+                    const lum = Math.max(0.2, 1.0 + fWave * 0.35);
+                    const op = Math.max(
+                      0.15,
+                      Math.min(1.0, state.baseOpacity * (0.65 + fWave * 0.35))
+                    );
+
+                    customRgbStroke = `rgba(${Math.min(255, Math.max(0, Math.round(r * lum)))}, ${Math.min(
+                      255,
+                      Math.max(0, Math.round(g * lum))
+                    )}, ${Math.min(255, Math.max(0, Math.round(b * lum)))}, ${op.toFixed(2)})`;
+                  }
+                  break;
+                }
               case "solfeggio": {
                 const solfIdx = Math.abs((frac * 9 + curPhase * 3) % 9);
                 const i0 = Math.floor(solfIdx);
@@ -1100,10 +1279,114 @@ export default function ToroidGeometryVisualizer({
               </button>
             </div>
 
-            {/* TAB 1: CURATED SWATCH GRID */}
+            {/* TAB 1: MULTI-FACET SELECTOR & MULTIVARIATE MATRIX */}
             {colorModeTab === "standard_swatches" && (
-              <div className="space-y-3 animate-in fade-in duration-200">
-                {/* Category Filter Pills */}
+              <div className="space-y-3.5 animate-in fade-in duration-200">
+                {/* 1. Active Multivariate Facets Header & Distribution Controls */}
+                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/90 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                      <span className="text-xs font-semibold text-white font-mono">
+                        Active Multivariate Facets ({activeFacetIds.length})
+                      </span>
+                    </div>
+
+                    {/* Distribution Mode Switcher */}
+                    <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-[10px] font-mono">
+                      {[
+                        { id: "interlaced_weave", label: "Weave" },
+                        { id: "radial_octaves", label: "Octaves" },
+                        { id: "interference_blend", label: "Blend" },
+                      ].map((dm) => (
+                        <button
+                          key={dm.id}
+                          onClick={() => {
+                            setFacetDistribution(dm.id as FacetDistributionMode);
+                            setPalette("multivariate_facets");
+                          }}
+                          className={`px-2 py-0.5 rounded transition ${
+                            facetDistribution === dm.id
+                              ? "bg-cyan-950 text-cyan-300 border border-cyan-500/40 font-semibold"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                          title={`Distribution Topology: ${dm.label}`}
+                        >
+                          {dm.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Active Facets Pill Chips */}
+                  <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto pr-1">
+                    {activeFacetIds.map((fid) => {
+                      const f = ALL_FACETS.find((item) => item.id === fid);
+                      if (!f) return null;
+                      return (
+                        <div
+                          key={fid}
+                          className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-700/80 text-[11px] font-mono text-slate-200 shadow-sm"
+                        >
+                          <span
+                            className="w-2.5 h-2.5 rounded-full border border-white/30 shrink-0"
+                            style={{
+                              background: `linear-gradient(135deg, ${f.coreHex}, ${f.accentHex})`,
+                            }}
+                          />
+                          <span className="text-[10px] font-medium">{f.name}</span>
+                          <span className="text-[9px] text-cyan-400 font-normal">
+                            {f.frequencyHz}Hz
+                          </span>
+                          <button
+                            onClick={() => toggleFacet(f.id)}
+                            className="text-slate-500 hover:text-rose-400 p-0.5 transition"
+                            title="Remove Facet"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Quick Cluster Selector Buttons */}
+                  <div className="flex items-center gap-1 overflow-x-auto pt-1 border-t border-slate-900 text-[10px] font-mono scrollbar-none">
+                    <span className="text-slate-500 shrink-0 mr-1">Clusters:</span>
+                    <button
+                      onClick={() => selectFacetCluster("chakra")}
+                      className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-rose-300 border border-slate-800 hover:border-rose-500/30 whitespace-nowrap transition"
+                    >
+                      Chakras (7)
+                    </button>
+                    <button
+                      onClick={() => selectFacetCluster("alchemical")}
+                      className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-800 hover:border-amber-500/30 whitespace-nowrap transition"
+                    >
+                      Alchemical (6)
+                    </button>
+                    <button
+                      onClick={() => selectFacetCluster("singularity")}
+                      className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-blue-300 border border-slate-800 hover:border-blue-500/30 whitespace-nowrap transition"
+                    >
+                      Singularity (6)
+                    </button>
+                    <button
+                      onClick={() => selectFacetCluster("neon")}
+                      className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-slate-800 hover:border-emerald-500/30 whitespace-nowrap transition"
+                    >
+                      Neon (6)
+                    </button>
+                    <button
+                      onClick={() => selectFacetCluster("all")}
+                      className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-800 hover:border-purple-500/30 whitespace-nowrap transition"
+                    >
+                      All (25)
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Category Filter Pills */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px] font-mono scrollbar-none">
                   {(["all", "chakra", "alchemical", "singularity", "neon"] as const).map((cat) => (
                     <button
@@ -1120,69 +1403,81 @@ export default function ToroidGeometryVisualizer({
                   ))}
                 </div>
 
-                {/* Swatch Matrix */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+                {/* 3. Multivariate Facet Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
                   {(swatchCategory === "all"
-                    ? ALL_SWATCHES
-                    : ALL_SWATCHES.filter((s) => s.category === swatchCategory)
+                    ? ALL_FACETS
+                    : ALL_FACETS.filter((s) => s.category === swatchCategory)
                   ).map((s) => {
-                    const isSelected = selectedHex.toUpperCase() === s.hex.toUpperCase();
+                    const isActive = activeFacetIds.includes(s.id);
                     return (
-                      <button
-                        key={s.name + s.hex}
-                        onClick={() => {
-                          setSelectedHex(s.hex);
-                          const rgb = hexToRgb(s.hex);
-                          setHslSliders(rgbToHsl(rgb.r, rgb.g, rgb.b));
-                          if (palette === "monochrome") setPalette("solid_tint");
-                        }}
-                        className={`p-2 rounded-xl border text-left transition flex items-center space-x-2.5 ${
-                          isSelected
-                            ? "bg-slate-800 text-white border-cyan-400 shadow-md ring-1 ring-cyan-400/50"
-                            : "bg-slate-950 text-slate-300 border-slate-800/80 hover:border-slate-700"
+                      <div
+                        key={s.id}
+                        onClick={() => toggleFacet(s.id)}
+                        className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-2.5 ${
+                          isActive
+                            ? "bg-slate-800/95 text-white border-cyan-400 shadow-md ring-1 ring-cyan-400/50"
+                            : "bg-slate-950/80 text-slate-300 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/60"
                         }`}
                       >
-                        <span
-                          className="w-5 h-5 rounded-lg border border-white/20 shadow-inner shrink-0"
-                          style={{ backgroundColor: s.hex }}
-                        />
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold truncate leading-tight">{s.name}</div>
-                          <div className="text-[10px] font-mono text-slate-500 truncate">{s.hex}</div>
+                        <div className="flex items-center space-x-2.5 min-w-0">
+                          {/* Dual-Tone Gradient Swatch Badge */}
+                          <div
+                            className="w-6 h-6 rounded-lg border border-white/20 shadow-inner shrink-0 flex items-center justify-center relative overflow-hidden"
+                            style={{
+                              background: `linear-gradient(135deg, ${s.coreHex} 0%, ${s.accentHex} 100%)`,
+                            }}
+                          >
+                            {isActive && <Check className="w-3.5 h-3.5 text-white drop-shadow" />}
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold truncate leading-tight flex items-center gap-1.5">
+                              <span>{s.name}</span>
+                              <span className="text-[9px] font-mono text-cyan-400 font-normal">
+                                {s.frequencyHz}Hz
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate leading-tight mt-0.5">
+                              {s.meaning}
+                            </div>
+                          </div>
                         </div>
-                      </button>
+
+                        {/* Solo Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            soloFacet(s.id);
+                          }}
+                          className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-900 hover:bg-cyan-950 text-slate-400 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-500/40 transition shrink-0"
+                          title="Solo this facet"
+                        >
+                          Solo
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
 
-                {/* Quick Swatch Action Footer */}
+                {/* 4. Action Footer */}
                 <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
                   <span className="text-slate-400 text-[11px]">
-                    Active: <span className="font-mono text-cyan-300 font-semibold">{selectedHex}</span>
+                    Mode:{" "}
+                    <span className="font-mono text-cyan-300 font-semibold uppercase">
+                      {palette === "multivariate_facets" ? `${facetDistribution}` : palette}
+                    </span>
                   </span>
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => setPalette("solid_tint")}
-                      className={`px-2 py-1 rounded-lg border text-[11px] font-mono transition ${
-                        palette === "solid_tint"
-                          ? "bg-cyan-950/80 text-cyan-300 border-cyan-500/50"
+                      onClick={() => setPalette("multivariate_facets")}
+                      className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono transition font-semibold ${
+                        palette === "multivariate_facets"
+                          ? "bg-cyan-950/90 text-cyan-300 border-cyan-500/60 shadow-sm"
                           : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
                       }`}
                     >
-                      Solid Tint
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (!customSpectrumStops.includes(selectedHex)) {
-                          setCustomSpectrumStops([...customSpectrumStops, selectedHex]);
-                          setPalette("custom_spectrum");
-                          toastSuccess(`Added ${selectedHex} to custom spectrum`);
-                        }
-                      }}
-                      className="px-2 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[11px] font-mono transition flex items-center gap-1"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>To Spectrum</span>
+                      Active Facet Stream
                     </button>
                   </div>
                 </div>
