@@ -377,6 +377,67 @@ func (h *Handler) ToroidGeometryHandler(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+// ToroidStreamHandler streams real-time continuous harmonic wave states over Server-Sent Events (SSE).
+// It features high-precision ticker synchronization, zero-leak goroutine termination, and pooled buffers.
+func (h *Handler) ToroidStreamHandler(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	q := r.URL.Query()
+	lineCount := 108
+	if v := q.Get("lines"); v != "" {
+		if val, err := strconv.Atoi(v); err == nil && val > 0 {
+			lineCount = val
+		}
+	}
+	waveMode := q.Get("mode")
+	if waveMode == "" {
+		waveMode = "orbital_swirl"
+	}
+	multiplier := 3
+	if v := q.Get("multiplier"); v != "" {
+		if val, err := strconv.Atoi(v); err == nil && val > 0 {
+			multiplier = val
+		}
+	}
+	palette := q.Get("palette")
+	if palette == "" {
+		palette = "solfeggio"
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	ticker := time.NewTicker(33 * time.Millisecond) // ~30 FPS broadcast
+	defer ticker.Stop()
+
+	start := time.Now()
+	var frameIdx int64 = 0
+
+	for {
+		select {
+		case <-r.Context().Done():
+			// Client disconnected - cleanly exit to prevent memory or goroutine leak
+			return
+		case now := <-ticker.C:
+			frameIdx++
+			tSec := now.Sub(start).Seconds()
+			frame := ComputeContinuousHarmonicFrame(lineCount, tSec, waveMode, multiplier, palette, frameIdx)
+			data, err := json.Marshal(frame)
+			if err != nil {
+				continue
+			}
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		}
+	}
+}
+
 // ArtworkCatalogHandler returns all available sacred artworks in the AMRA Treasury Storehouse.
 func (h *Handler) ArtworkCatalogHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {

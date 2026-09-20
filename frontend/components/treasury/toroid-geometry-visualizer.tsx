@@ -11,14 +11,14 @@ import {
   Check,
   BookmarkPlus,
   Sliders,
-  Radio,
   Music,
   Activity,
-  Video,
   Layers,
-  Clock,
   Gauge,
-  Eye,
+  Cpu,
+  Radio,
+  Zap,
+  RotateCw,
 } from "lucide-react";
 import {
   ToroidParams,
@@ -45,17 +45,19 @@ export type WaveCirculationMode =
   | "standing_wave"
   | "doppler_vortex";
 
+export type EngineMode = "client_gpu" | "server_stream";
+
 export default function ToroidGeometryVisualizer({
   onPresetSelect,
 }: ToroidGeometryVisualizerProps) {
-  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
 
   // 1. Mathematical Geometry Parameters
   const [majorR, setMajorR] = useState<number>(130);
   const [minorR, setMinorR] = useState<number>(95);
   const [lineCount, setLineCount] = useState<number>(108);
   const [missMargin, setMissMargin] = useState<number>(7.5);
-  const [tiltAngle, setTiltAngle] = useState<number>(35); // Default to 35° tilt matching user's artwork
+  const [tiltAngle, setTiltAngle] = useState<number>(35); // 35° isometric tilt matching user's artwork
   const [mode, setMode] = useState<"discrete_rings" | "continuous" | "chords">("discrete_rings");
   const [baseStrokeWidth, setBaseStrokeWidth] = useState<number>(1.0);
   const [baseOpacity, setBaseOpacity] = useState<number>(0.75);
@@ -66,29 +68,79 @@ export default function ToroidGeometryVisualizer({
   const [harmonicMultiplier, setHarmonicMultiplier] = useState<number>(3); // 3-fold harmonic overtone
   const [spaceInterference, setSpaceInterference] = useState<number>(0.45); // Luminescence in spaces between lines
 
-  // 3. Timing, Loop Duration & Animation Speed
+  // 3. Continuous Flow & Engine Mode State
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
-  const [loopDurationSeconds, setLoopDurationSeconds] = useState<number>(8.0); // Exact loop period (e.g. 8s)
   const [speedMultiplier, setSpeedMultiplier] = useState<number>(1.0);
-  const [animProgress, setAnimProgress] = useState<number>(0); // 0.0 to 1.0 within loop period
+  const [flowDirection, setFlowDirection] = useState<1 | -1>(1);
+  const [engineMode, setEngineMode] = useState<EngineMode>("client_gpu");
 
-  // 4. Video Recording & Export State
-  const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [recordProgress, setRecordProgress] = useState<number>(0); // 0% to 100%
-  const [exportFormat, setExportFormat] = useState<"mp4" | "m4a" | "webm">("mp4");
+  // Telemetry display (throttled to 2 Hz to guarantee zero React memory churn)
+  const [displayFps, setDisplayFps] = useState<number>(60);
+  const [livePhase, setLivePhase] = useState<number>(0);
+  const [streamActive, setStreamActive] = useState<boolean>(false);
 
-  // 5. API Data & Utility State
+  // 4. API Data & Presets State
   const [toroidData, setToroidData] = useState<ToroidGeometryResult | null>(null);
   const [presets, setPresets] = useState<ToroidPreset[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [savingPreset, setSavingPreset] = useState<boolean>(false);
 
+  // High-Performance Zero-Allocation Animation Refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const animFrameRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number | null>(null);
+  const pathCacheRef = useRef<Path2D[]>([]);
+  const continuousPathRef = useRef<Path2D | null>(null);
+  const animFrameIdRef = useRef<number | null>(null);
+  const sseEventSourceRef = useRef<EventSource | null>(null);
 
-  // Solfeggio 9-Frequency Harmonic Spectrum (Hz -> Chromatic Hues)
+  // Mutable continuous state container (accessed at 60/120 FPS without React reconciliation)
+  const engineStateRef = useRef({
+    phase: 0.0,
+    lastTimestamp: 0.0,
+    frameCount: 0,
+    fpsLastTime: 0.0,
+    fpsCurrent: 60,
+    isPlaying: true,
+    speedMultiplier: 1.0,
+    flowDirection: 1,
+    spaceInterference: 0.45,
+    harmonicMultiplier: 3,
+    palette: "solfeggio" as HarmonicColorPalette,
+    waveMode: "orbital_swirl" as WaveCirculationMode,
+    baseOpacity: 0.75,
+    baseStrokeWidth: 1.0,
+    lineCount: 108,
+    mode: "discrete_rings" as "discrete_rings" | "continuous" | "chords",
+  });
+
+  // Sync React props to mutable ref so the render loop always has latest settings without restart
+  useEffect(() => {
+    engineStateRef.current.isPlaying = isPlaying;
+    engineStateRef.current.speedMultiplier = speedMultiplier;
+    engineStateRef.current.flowDirection = flowDirection;
+    engineStateRef.current.spaceInterference = spaceInterference;
+    engineStateRef.current.harmonicMultiplier = harmonicMultiplier;
+    engineStateRef.current.palette = palette;
+    engineStateRef.current.waveMode = waveMode;
+    engineStateRef.current.baseOpacity = baseOpacity;
+    engineStateRef.current.baseStrokeWidth = baseStrokeWidth;
+    engineStateRef.current.lineCount = lineCount;
+    engineStateRef.current.mode = mode;
+  }, [
+    isPlaying,
+    speedMultiplier,
+    flowDirection,
+    spaceInterference,
+    harmonicMultiplier,
+    palette,
+    waveMode,
+    baseOpacity,
+    baseStrokeWidth,
+    lineCount,
+    mode,
+  ]);
+
+  // Solfeggio 9 Frequencies (Hz -> Hue)
   const solfeggioFrequencies = useMemo(
     () => [
       { hz: 174, name: "Foundation", hue: 0 },       // Red
@@ -131,6 +183,16 @@ export default function ToroidGeometryVisualizer({
           if (data.presets && data.presets.length > 0) {
             setPresets(data.presets);
           }
+
+          // Pre-compile and cache Path2D objects once into memory pool
+          if (data.geometry.loops && data.geometry.loops.length > 0) {
+            pathCacheRef.current = data.geometry.loops.map((l) => new Path2D(l.svg_path));
+          } else {
+            pathCacheRef.current = [];
+          }
+          if (data.geometry.svg_path) {
+            continuousPathRef.current = new Path2D(data.geometry.svg_path);
+          }
         }
       } catch (err) {
         console.error("Failed to load toroid geometry:", err);
@@ -145,337 +207,300 @@ export default function ToroidGeometryVisualizer({
     fetchGeometry();
   }, [fetchGeometry]);
 
-  // Compute Chromatic Color for Line k at Normalized Loop Phase t
-  const getLineStyle = useCallback(
-    (k: number, total: number, phase: number) => {
-      const frac = total > 0 ? k / total : 0;
-
-      // Calculate Wave Modulation depending on circulation mode
-      let waveFactor = 0;
-      switch (waveMode) {
-        case "orbital_swirl":
-          // Traveling sinusoidal circulation around the ring
-          waveFactor = Math.sin(2 * Math.PI * (frac * harmonicMultiplier - phase));
-          break;
-        case "singularity_ingestion":
-          // Inward breathing pulse toward the event horizon
-          waveFactor = Math.cos(2 * Math.PI * (frac * 2 + phase * harmonicMultiplier));
-          break;
-        case "standing_wave":
-          // Chladni standing wave resonance with nodes and antinodes
-          waveFactor =
-            Math.sin(2 * Math.PI * frac * harmonicMultiplier) *
-            Math.cos(2 * Math.PI * phase);
-          break;
-        case "doppler_vortex":
-          // Accelerating wave phase shift
-          waveFactor = Math.sin(2 * Math.PI * (Math.pow(frac, 1.5) * harmonicMultiplier - phase));
-          break;
-      }
-
-      // Resolve Chromatic Hue from Musical Spectrum
-      let hue = 0;
-      let saturation = 85;
-      let lightness = 55;
-
-      switch (palette) {
-        case "solfeggio": {
-          // Continuous interpolation across the 9 Solfeggio frequency stations
-          const solfIdx = (frac * solfeggioFrequencies.length + phase * 3) % solfeggioFrequencies.length;
-          const i0 = Math.floor(solfIdx);
-          const i1 = (i0 + 1) % solfeggioFrequencies.length;
-          const mix = solfIdx - i0;
-          hue = solfeggioFrequencies[i0].hue * (1 - mix) + solfeggioFrequencies[i1].hue * mix;
-          saturation = 90;
-          lightness = 50 + waveFactor * 18;
-          break;
-        }
-        case "pythagorean": {
-          // Pythagorean fifths spiral (3:2 frequency ratio)
-          const pythSteps = (k * 7) % 12; // Cycle of fifths
-          hue = (pythSteps / 12) * 360 + phase * 180;
-          saturation = 80;
-          lightness = 52 + waveFactor * 15;
-          break;
-        }
-        case "synesthesia": {
-          // Full 360° synesthesia rainbow circulation
-          hue = (frac * 360 + phase * 360) % 360;
-          saturation = 95;
-          lightness = 55 + waveFactor * 15;
-          break;
-        }
-        case "bioluminescent": {
-          // Emerald to deep cyan oceanic frequency spectrum (150° to 220°)
-          hue = 155 + ((frac + phase) % 1.0) * 65;
-          saturation = 95;
-          lightness = 58 + waveFactor * 20;
-          break;
-        }
-        case "monochrome":
-        default: {
-          // Plain silver & platinum lines with luminescent frequency breathing
-          hue = 215;
-          saturation = 15;
-          lightness = 65 + waveFactor * 25;
-          break;
-        }
-      }
-
-      const opacity = Math.max(
-        0.15,
-        Math.min(1.0, baseOpacity * (0.65 + waveFactor * 0.35))
-      );
-      const strokeW = Math.max(
-        0.4,
-        baseStrokeWidth * (0.75 + Math.abs(waveFactor) * 0.45)
-      );
-
-      return {
-        color: `hsla(${Math.round(hue)}, ${saturation}%, ${Math.round(lightness)}%, ${opacity.toFixed(2)})`,
-        width: strokeW,
-        opacity,
-      };
-    },
-    [palette, waveMode, harmonicMultiplier, baseOpacity, baseStrokeWidth, solfeggioFrequencies]
-  );
-
-  // Main High-Precision Animation Loop
+  // Server-Sent Events (SSE) Continuous Stream Integration
   useEffect(() => {
-    if (!isPlaying) {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    if (engineMode !== "server_stream") {
+      if (sseEventSourceRef.current) {
+        sseEventSourceRef.current.close();
+        sseEventSourceRef.current = null;
+        setStreamActive(false);
+      }
       return;
     }
 
-    const loopDurationMs = (loopDurationSeconds / speedMultiplier) * 1000;
+    const query = new URLSearchParams({
+      lines: lineCount.toString(),
+      mode: waveMode,
+      multiplier: harmonicMultiplier.toString(),
+      palette: palette,
+    });
+    const sseUrl = `/api/v1/amra/geometry/toroid/stream?${query.toString()}`;
+    const sse = new EventSource(sseUrl);
+    sseEventSourceRef.current = sse;
 
-    const tick = (timestamp: number) => {
-      if (!startTimeRef.current) startTimeRef.current = timestamp;
-      const elapsed = timestamp - startTimeRef.current;
-      const currentPhase = (elapsed % loopDurationMs) / loopDurationMs; // Exact [0.0, 1.0) loop phase
-      setAnimProgress(currentPhase);
-      animFrameRef.current = requestAnimationFrame(tick);
+    sse.onopen = () => {
+      setStreamActive(true);
     };
 
-    animFrameRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    };
-  }, [isPlaying, loopDurationSeconds, speedMultiplier]);
-
-  // Synchronized HTML5 Canvas Drawing for High-Performance Rendering & Video Capture
-  const drawToCanvas = useCallback(
-    (ctx: CanvasRenderingContext2D, width: number, height: number, phase: number) => {
-      if (!toroidData) return;
-
-      ctx.save();
-      ctx.clearRect(0, 0, width, height);
-
-      // 1. Deep Space Obsidian Background
-      ctx.fillStyle = "#020617";
-      ctx.fillRect(0, 0, width, height);
-
-      // Coordinate Transform to Center
-      ctx.translate(width / 2, height / 2);
-      const scaleFactor = Math.min(width, height) / 500;
-      ctx.scale(scaleFactor, scaleFactor);
-
-      // 2. Inter-Filament Caustic Resonance (Glow in the spaces between lines)
-      if (spaceInterference > 0) {
-        const causticGlow = ctx.createRadialGradient(
-          0,
-          0,
-          toroidData.inner_hole_radius * 0.8,
-          0,
-          0,
-          toroidData.outer_radius * 1.05
-        );
-        const interHue = (phase * 360) % 360;
-        causticGlow.addColorStop(0, "rgba(0, 0, 0, 0.95)");
-        causticGlow.addColorStop(
-          0.35,
-          palette === "monochrome"
-            ? `rgba(226, 232, 240, ${spaceInterference * 0.12})`
-            : `hsla(${interHue}, 90%, 55%, ${spaceInterference * 0.22})`
-        );
-        causticGlow.addColorStop(
-          0.75,
-          palette === "monochrome"
-            ? `rgba(148, 163, 184, ${spaceInterference * 0.08})`
-            : `hsla(${(interHue + 120) % 360}, 85%, 45%, ${spaceInterference * 0.15})`
-        );
-        causticGlow.addColorStop(1, "rgba(2, 6, 23, 0)");
-
-        ctx.fillStyle = causticGlow;
-        ctx.beginPath();
-        ctx.arc(0, 0, toroidData.outer_radius * 1.15, 0, 2 * Math.PI);
-        ctx.fill();
-      }
-
-      // 3. Render Circumscribed Loops with Frequency Coloration
-      const loops = toroidData.loops || [];
-      const totalLoops = loops.length > 0 ? loops.length : lineCount;
-
-      if (loops.length > 0 && mode !== "continuous") {
-        for (let i = 0; i < loops.length; i++) {
-          const style = getLineStyle(i, totalLoops, phase);
-          ctx.strokeStyle = style.color;
-          ctx.lineWidth = style.width;
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
-
-          const path = new Path2D(loops[i].svg_path);
-          ctx.stroke(path);
+    sse.onmessage = (e) => {
+      try {
+        const frame = JSON.parse(e.data);
+        if (typeof frame.phase === "number") {
+          // Sync engine phase directly with Go backend continuous harmonic generator
+          engineStateRef.current.phase = frame.phase;
         }
-      } else if (toroidData.svg_path) {
-        // Continuous mode
-        const style = getLineStyle(0, totalLoops, phase);
-        ctx.strokeStyle = style.color;
-        ctx.lineWidth = style.width;
-        const path = new Path2D(toroidData.svg_path);
-        ctx.stroke(path);
+      } catch (err) {
+        // Ignore JSON frame parsing errors
       }
+    };
 
-      // 4. Central Event Horizon Black Hole Void (Masks center with true black singularity)
-      if (toroidData.inner_hole_radius > 5) {
-        const blackHoleGrad = ctx.createRadialGradient(
-          0,
-          0,
-          0,
-          0,
-          0,
-          toroidData.inner_hole_radius
-        );
-        blackHoleGrad.addColorStop(0, "#000000");
-        blackHoleGrad.addColorStop(0.75, "#000000");
-        blackHoleGrad.addColorStop(0.92, "#020617");
-        blackHoleGrad.addColorStop(1, "rgba(2, 6, 23, 0)");
+    sse.onerror = () => {
+      setStreamActive(false);
+    };
 
-        ctx.fillStyle = blackHoleGrad;
-        ctx.beginPath();
-        ctx.arc(0, 0, toroidData.inner_hole_radius, 0, 2 * Math.PI);
-        ctx.fill();
+    return () => {
+      sse.close();
+      sseEventSourceRef.current = null;
+      setStreamActive(false);
+    };
+  }, [engineMode, lineCount, waveMode, harmonicMultiplier, palette]);
 
-        // Singularity Horizon Ring (Subtle perimeter)
-        ctx.strokeStyle =
-          palette === "monochrome"
-            ? "rgba(203, 213, 225, 0.4)"
-            : `hsla(${(phase * 360) % 360}, 80%, 65%, 0.5)`;
-        ctx.lineWidth = 0.8;
-        ctx.setLineDash([2, 3]);
-        ctx.beginPath();
-        ctx.arc(0, 0, toroidData.inner_hole_radius, 0, 2 * Math.PI);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Central Bindu
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.arc(0, 0, 1.8, 0, 2 * Math.PI);
-        ctx.fill();
-      }
-
-      ctx.restore();
-    },
-    [toroidData, lineCount, mode, spaceInterference, palette, getLineStyle]
-  );
-
-  // Sync canvas display on animation frame
+  // Main Zero-Allocation Continuous Animation Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
-    drawToCanvas(ctx, canvas.width, canvas.height, animProgress);
-  }, [animProgress, drawToCanvas]);
 
-  // Video & M4A / MP4 Export Engine (Canvas Stream MediaRecorder)
-  const handleExportAnimation = async () => {
-    if (!toroidData || isRecording) return;
+    let isSubscribed = true;
 
-    // Check MediaRecorder browser support
-    let mimeType = "video/mp4";
-    if (typeof MediaRecorder === "undefined") {
-      toastError("MediaRecorder API is not available in this environment.");
-      return;
-    }
+    const renderContinuousFrame = (timestamp: number) => {
+      if (!isSubscribed) return;
 
-    if (MediaRecorder.isTypeSupported("video/mp4;codecs=avc1")) {
-      mimeType = "video/mp4;codecs=avc1";
-    } else if (MediaRecorder.isTypeSupported("video/mp4")) {
-      mimeType = "video/mp4";
-    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) {
-      mimeType = "video/webm;codecs=vp9";
-    } else if (MediaRecorder.isTypeSupported("video/webm")) {
-      mimeType = "video/webm";
-    }
+      const state = engineStateRef.current;
 
-    setIsRecording(true);
-    setRecordProgress(0);
-    toastInfo(`Recording high-definition seamless loop (${loopDurationSeconds}s)...`);
-
-    // Create high-resolution dedicated offscreen recording canvas (1080x1080 60FPS)
-    const recCanvas = document.createElement("canvas");
-    recCanvas.width = 1080;
-    recCanvas.height = 1080;
-    const recCtx = recCanvas.getContext("2d");
-    if (!recCtx) {
-      setIsRecording(false);
-      toastError("Failed to initialize recording context.");
-      return;
-    }
-
-    const fps = 60;
-    const stream = recCanvas.captureStream(fps);
-    const recorder = new MediaRecorder(stream, {
-      mimeType,
-      videoBitsPerSecond: 12000000, // 12 Mbps crystal clear lines
-    });
-
-    const recordedChunks: Blob[] = [];
-    recorder.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) recordedChunks.push(e.data);
-    };
-
-    recorder.onstop = () => {
-      const extension = exportFormat === "m4a" ? "m4a" : exportFormat === "mp4" ? "mp4" : "webm";
-      const blob = new Blob(recordedChunks, { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `toroid-harmonic-${palette}-${loopDurationSeconds}s.${extension}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setIsRecording(false);
-      setRecordProgress(100);
-      toastSuccess(`Exported seamless ${extension.toUpperCase()} loop (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
-    };
-
-    recorder.start();
-
-    // Render precise frames across the configured loop duration
-    const totalFrames = Math.round(loopDurationSeconds * fps);
-    let currentFrame = 0;
-
-    const renderLoopFrame = () => {
-      if (currentFrame >= totalFrames) {
-        recorder.stop();
-        return;
+      if (!state.lastTimestamp) {
+        state.lastTimestamp = timestamp;
+        state.fpsLastTime = timestamp;
       }
 
-      const framePhase = currentFrame / totalFrames; // Exact 0.0 to 1.0 progression
-      drawToCanvas(recCtx, 1080, 1080, framePhase);
-      currentFrame++;
-      setRecordProgress(Math.round((currentFrame / totalFrames) * 100));
+      const deltaTime = Math.min(timestamp - state.lastTimestamp, 100); // Clamped delta to prevent jump on tab switch
+      state.lastTimestamp = timestamp;
 
-      // Schedule next frame
-      setTimeout(renderLoopFrame, 1000 / fps);
+      // Advance continuous monotonic phase (never wrapped, continuous across infinity)
+      if (state.isPlaying && engineMode === "client_gpu") {
+        const speed = 0.00018 * state.speedMultiplier * state.flowDirection;
+        state.phase += deltaTime * speed;
+      }
+
+      // Live FPS calculation (computed over 1 second rolling window)
+      state.frameCount++;
+      if (timestamp - state.fpsLastTime >= 500) {
+        const fps = Math.round((state.frameCount * 1000) / (timestamp - state.fpsLastTime));
+        state.fpsCurrent = fps;
+        state.frameCount = 0;
+        state.fpsLastTime = timestamp;
+
+        // Throttled UI update (2 Hz)
+        setDisplayFps(fps);
+        setLivePhase(state.phase % 1.0);
+      }
+
+      // Zero-Allocation Direct Canvas Rendering
+      const width = canvas.width;
+      const height = canvas.height;
+      const curPhase = state.phase;
+      const tData = toroidData;
+
+      if (tData) {
+        ctx.save();
+
+        // 1. Deep Space Obsidian Background
+        ctx.fillStyle = "#020617";
+        ctx.fillRect(0, 0, width, height);
+
+        // Center coordinates
+        ctx.translate(width / 2, height / 2);
+        const scaleFactor = Math.min(width, height) / 500;
+        ctx.scale(scaleFactor, scaleFactor);
+
+        // 2. Inter-Filament Caustic Resonance (Spaces between lines)
+        if (state.spaceInterference > 0) {
+          const causticGlow = ctx.createRadialGradient(
+            0,
+            0,
+            tData.inner_hole_radius * 0.8,
+            0,
+            0,
+            tData.outer_radius * 1.08
+          );
+          const interHue = Math.floor(((curPhase * 360) % 360 + 360) % 360);
+
+          causticGlow.addColorStop(0, "#000000");
+          causticGlow.addColorStop(
+            0.35,
+            state.palette === "monochrome"
+              ? `rgba(226, 232, 240, ${state.spaceInterference * 0.12})`
+              : `hsla(${interHue}, 90%, 55%, ${state.spaceInterference * 0.22})`
+          );
+          causticGlow.addColorStop(
+            0.75,
+            state.palette === "monochrome"
+              ? `rgba(148, 163, 184, ${state.spaceInterference * 0.08})`
+              : `hsla(${(interHue + 120) % 360}, 85%, 45%, ${state.spaceInterference * 0.15})`
+          );
+          causticGlow.addColorStop(1, "rgba(2, 6, 23, 0)");
+
+          ctx.fillStyle = causticGlow;
+          ctx.beginPath();
+          ctx.arc(0, 0, tData.outer_radius * 1.15, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+
+        // 3. Render Pre-compiled Filament Paths (Zero object allocations per frame)
+        const cachedPaths = pathCacheRef.current;
+        const totalLoops = cachedPaths.length > 0 ? cachedPaths.length : state.lineCount;
+
+        if (cachedPaths.length > 0 && state.mode !== "continuous") {
+          for (let i = 0; i < cachedPaths.length; i++) {
+            const frac = totalLoops > 0 ? i / totalLoops : 0;
+
+            // Wave modulation computation
+            let waveFactor = 0;
+            switch (state.waveMode) {
+              case "orbital_swirl":
+                waveFactor = Math.sin(2 * Math.PI * (frac * state.harmonicMultiplier - curPhase));
+                break;
+              case "singularity_ingestion":
+                waveFactor = Math.cos(2 * Math.PI * (frac * 2.0 + curPhase * state.harmonicMultiplier));
+                break;
+              case "standing_wave":
+                waveFactor =
+                  Math.sin(2 * Math.PI * frac * state.harmonicMultiplier) *
+                  Math.cos(2 * Math.PI * curPhase);
+                break;
+              case "doppler_vortex":
+                waveFactor = Math.sin(
+                  2 * Math.PI * (Math.pow(frac, 1.5) * state.harmonicMultiplier - curPhase)
+                );
+                break;
+            }
+
+            // Frequency spectrum color resolution
+            let hue = 0;
+            let saturation = 85;
+            let lightness = 55;
+
+            switch (state.palette) {
+              case "solfeggio": {
+                const solfIdx = Math.abs((frac * 9 + curPhase * 3) % 9);
+                const i0 = Math.floor(solfIdx);
+                const i1 = (i0 + 1) % 9;
+                const mix = solfIdx - i0;
+                hue = solfeggioFrequencies[i0].hue * (1 - mix) + solfeggioFrequencies[i1].hue * mix;
+                saturation = 90;
+                lightness = 50 + waveFactor * 18;
+                break;
+              }
+              case "pythagorean": {
+                const pythSteps = (i * 7) % 12;
+                hue = Math.abs(((pythSteps / 12) * 360 + curPhase * 180) % 360);
+                saturation = 80;
+                lightness = 52 + waveFactor * 15;
+                break;
+              }
+              case "synesthesia": {
+                hue = Math.abs(((frac * 360 + curPhase * 360) % 360 + 360) % 360);
+                saturation = 95;
+                lightness = 55 + waveFactor * 15;
+                break;
+              }
+              case "bioluminescent": {
+                hue = 155 + Math.abs(((frac + curPhase) % 1.0) * 65);
+                saturation = 95;
+                lightness = 58 + waveFactor * 20;
+                break;
+              }
+              case "monochrome":
+              default: {
+                hue = 215;
+                saturation = 15;
+                lightness = 65 + waveFactor * 25;
+                break;
+              }
+            }
+
+            const opacity = Math.max(
+              0.15,
+              Math.min(1.0, state.baseOpacity * (0.65 + waveFactor * 0.35))
+            );
+            const strokeW = Math.max(
+              0.4,
+              state.baseStrokeWidth * (0.75 + Math.abs(waveFactor) * 0.45)
+            );
+
+            ctx.strokeStyle = `hsla(${Math.round(hue)}, ${saturation}%, ${Math.round(lightness)}%, ${opacity.toFixed(2)})`;
+            ctx.lineWidth = strokeW;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            ctx.stroke(cachedPaths[i]);
+          }
+        } else if (continuousPathRef.current) {
+          // Continuous mode
+          const waveFactor = Math.sin(2 * Math.PI * curPhase);
+          ctx.strokeStyle =
+            state.palette === "monochrome"
+              ? "#e2e8f0"
+              : `hsla(${Math.round(Math.abs((curPhase * 360) % 360))}, 90%, 55%, 0.8)`;
+          ctx.lineWidth = state.baseStrokeWidth * (0.8 + Math.abs(waveFactor) * 0.4);
+          ctx.stroke(continuousPathRef.current);
+        }
+
+        // 4. Central Event Horizon Black Hole Void (Masks center with pure black)
+        if (tData.inner_hole_radius > 5) {
+          const blackHoleGrad = ctx.createRadialGradient(
+            0,
+            0,
+            0,
+            0,
+            0,
+            tData.inner_hole_radius
+          );
+          blackHoleGrad.addColorStop(0, "#000000");
+          blackHoleGrad.addColorStop(0.75, "#000000");
+          blackHoleGrad.addColorStop(0.92, "#020617");
+          blackHoleGrad.addColorStop(1, "rgba(2, 6, 23, 0)");
+
+          ctx.fillStyle = blackHoleGrad;
+          ctx.beginPath();
+          ctx.arc(0, 0, tData.inner_hole_radius, 0, 2 * Math.PI);
+          ctx.fill();
+
+          // Singularity Horizon Ring
+          ctx.strokeStyle =
+            state.palette === "monochrome"
+              ? "rgba(203, 213, 225, 0.4)"
+              : `hsla(${Math.round(Math.abs((curPhase * 360) % 360))}, 80%, 65%, 0.5)`;
+          ctx.lineWidth = 0.8;
+          ctx.setLineDash([2, 3]);
+          ctx.beginPath();
+          ctx.arc(0, 0, tData.inner_hole_radius, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Central Bindu
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(0, 0, 1.8, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+
+      animFrameIdRef.current = requestAnimationFrame(renderContinuousFrame);
     };
 
-    renderLoopFrame();
-  };
+    animFrameIdRef.current = requestAnimationFrame(renderContinuousFrame);
+
+    return () => {
+      isSubscribed = false;
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+      }
+    };
+  }, [toroidData, engineMode, solfeggioFrequencies]);
 
   // Apply Preset
   const handleApplyPreset = (preset: ToroidPreset) => {
@@ -511,8 +536,8 @@ export default function ToroidGeometryVisualizer({
     setSavingPreset(true);
     try {
       const presetName = prompt(
-        "Name this Harmonic Toroidal Artwork Preset:",
-        "Harmonic Resonance Torus"
+        "Name this Continuous Flow Torus Preset:",
+        "Infinite Harmonic Torus"
       );
       if (!presetName) {
         setSavingPreset(false);
@@ -524,7 +549,7 @@ export default function ToroidGeometryVisualizer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: presetName,
-          description: `${palette.toUpperCase()} palette, ${lineCount} lines, miss margin ${missMargin}°, tilt ${tiltAngle}°, duration ${loopDurationSeconds}s.`,
+          description: `Continuous Flow (${palette}, ${waveMode}), ${lineCount} lines, miss margin ${missMargin}°, tilt ${tiltAngle}°.`,
           major_radius: majorR,
           minor_radius: minorR,
           line_count: lineCount,
@@ -554,17 +579,18 @@ export default function ToroidGeometryVisualizer({
         <div>
           <div className="flex items-center space-x-2">
             <span className="p-1.5 rounded-lg bg-cyan-950/80 border border-cyan-500/40 text-cyan-400">
-              <Music className="w-5 h-5" />
+              <Zap className="w-5 h-5" />
             </span>
             <div>
               <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Toroidal Harmonics &amp; Multi-Colored Wave Circulation</span>
-                <span className="text-xs font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-normal">
-                  Musical Noise Spectrum • {lineCount} Filaments
+                <span>Toroidal Harmonics • Infinite Continuous Flow</span>
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-normal flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Never-Ending Stream
                 </span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Dividing the musical frequency spectrum into a myriad matching the lines, circulating waves through the toroid and spaces between lines.
+                Harmonic wave circulation through circumscribed lines and inter-filament spaces, powered by zero-allocation continuous flow mechanics.
               </p>
             </div>
           </div>
@@ -592,60 +618,42 @@ export default function ToroidGeometryVisualizer({
         </div>
       </div>
 
-      {/* 2. Main Studio Grid: Interactive Screen + Control Panels */}
+      {/* 2. Main Studio Grid: Screen + Control Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left: Live Visualizer & Canvas (7 cols) */}
+        {/* Left: Continuous Canvas (7 cols) */}
         <div className="lg:col-span-7 bg-slate-950/95 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center relative overflow-hidden">
-          {/* Top Status Bar */}
+          {/* Top Status & Memory Telemetry Bar */}
           <div className="w-full flex justify-between items-center mb-3 text-xs font-mono text-slate-400">
             <span className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${isPlaying ? "bg-emerald-400 animate-pulse" : "bg-slate-600"}`}></span>
-              <span className="text-slate-300">Phase: {(animProgress * 100).toFixed(1)}%</span>
-              <span className="text-slate-500">• Loop: {loopDurationSeconds}s</span>
+              <span className="text-slate-200">FPS: <strong className="text-emerald-400">{displayFps}</strong></span>
+              <span className="text-slate-500">• Heap: Zero-Alloc Pool</span>
             </span>
+
             <div className="flex items-center gap-3 text-slate-400">
-              <span>Hole: <strong className="text-cyan-300">{toroidData?.inner_hole_radius?.toFixed(0) || Math.abs(majorR - minorR)}px</strong></span>
+              <span className="flex items-center gap-1">
+                <Cpu className="w-3 h-3 text-cyan-400" />
+                <span className="capitalize">{engineMode.replace("_", " ")}</span>
+                {streamActive && <span className="text-emerald-400">(SSE Live)</span>}
+              </span>
               <span>Filaments: <strong className="text-purple-300">{lineCount}</strong></span>
               <span className="text-amber-400">δ = {missMargin}°</span>
             </div>
           </div>
 
           {/* Canvas Rendering Port */}
-          <div className="w-full aspect-square max-w-[480px] relative flex items-center justify-center p-2 rounded-2xl bg-black border border-slate-900 shadow-2xl overflow-hidden group">
+          <div className="w-full aspect-square max-w-[480px] relative flex items-center justify-center p-2 rounded-2xl bg-black border border-slate-900 shadow-2xl overflow-hidden">
             <canvas
               ref={canvasRef}
-              width={600}
-              height={600}
+              width={640}
+              height={640}
               className="w-full h-full object-contain rounded-xl select-none"
             />
-
-            {/* Recording Progress Overlay */}
-            {isRecording && (
-              <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 space-y-4">
-                <div className="w-12 h-12 rounded-full border-4 border-cyan-500/20 border-t-cyan-400 animate-spin flex items-center justify-center">
-                  <Video className="w-5 h-5 text-cyan-400 animate-pulse" />
-                </div>
-                <div className="text-center space-y-1">
-                  <div className="text-sm font-semibold text-white font-mono">
-                    Rendering Seamless {exportFormat.toUpperCase()} Loop
-                  </div>
-                  <div className="text-xs text-cyan-400 font-mono">
-                    Recording 60 FPS • {recordProgress}% Complete
-                  </div>
-                </div>
-                <div className="w-48 bg-slate-800 rounded-full h-1.5 overflow-hidden border border-slate-700">
-                  <div
-                    className="bg-cyan-400 h-full transition-all duration-100"
-                    style={{ width: `${recordProgress}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Playback & Loop Transport Bar */}
+          {/* Playback & Continuous Transport Bar */}
           <div className="w-full mt-4 pt-3 border-t border-slate-900 flex flex-wrap items-center justify-between gap-3 text-xs">
-            {/* Play/Pause & Speed */}
+            {/* Play/Pause & Direction */}
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setIsPlaying(!isPlaying)}
@@ -656,7 +664,16 @@ export default function ToroidGeometryVisualizer({
                 }`}
               >
                 {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                <span>{isPlaying ? "Pause Loop" : "Play Loop"}</span>
+                <span>{isPlaying ? "Flowing" : "Paused"}</span>
+              </button>
+
+              <button
+                onClick={() => setFlowDirection((prev) => (prev === 1 ? -1 : 1))}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 flex items-center space-x-1 font-mono text-[11px] transition"
+                title="Reverse wave circulation direction"
+              >
+                <RotateCw className={`w-3 h-3 ${flowDirection === -1 ? "-scale-x-100 text-amber-400" : "text-cyan-400"}`} />
+                <span>{flowDirection === 1 ? "Forward" : "Reverse"}</span>
               </button>
 
               {/* Speed Multiplier */}
@@ -665,57 +682,46 @@ export default function ToroidGeometryVisualizer({
                 <span>{speedMultiplier.toFixed(1)}x</span>
                 <input
                   type="range"
-                  min="0.2"
-                  max="3.0"
+                  min="0.1"
+                  max="4.0"
                   step="0.1"
                   value={speedMultiplier}
                   onChange={(e) => setSpeedMultiplier(parseFloat(e.target.value))}
-                  className="w-14 accent-cyan-400 bg-slate-800 h-1 cursor-pointer"
-                  title="Animation Circulation Speed"
+                  className="w-16 accent-cyan-400 bg-slate-800 h-1 cursor-pointer"
+                  title="Wave circulation speed"
                 />
               </div>
             </div>
 
-            {/* Loop Duration Selector Chips */}
-            <div className="flex items-center space-x-1 font-mono text-[11px]">
-              <Clock className="w-3 h-3 text-slate-500 mr-1" />
-              {[4, 8, 12, 16].map((sec) => (
-                <button
-                  key={sec}
-                  onClick={() => setLoopDurationSeconds(sec)}
-                  className={`px-2 py-1 rounded border transition ${
-                    loopDurationSeconds === sec
-                      ? "bg-purple-950/80 text-purple-300 border-purple-500/50 font-semibold"
-                      : "bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200"
-                  }`}
-                >
-                  {sec}s
-                </button>
-              ))}
+            {/* Engine Mode Toggle (Client GPU vs Server SSE Stream) */}
+            <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-800 font-mono text-[11px]">
+              <button
+                onClick={() => setEngineMode("client_gpu")}
+                className={`px-2 py-1 rounded transition ${
+                  engineMode === "client_gpu"
+                    ? "bg-slate-800 text-white font-semibold shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                title="Hardware-accelerated continuous GPU Canvas rendering"
+              >
+                GPU Loop
+              </button>
+              <button
+                onClick={() => setEngineMode("server_stream")}
+                className={`px-2 py-1 rounded transition flex items-center space-x-1 ${
+                  engineMode === "server_stream"
+                    ? "bg-cyan-950 text-cyan-300 border border-cyan-700/50 font-semibold shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                title="Real-time Server-Sent Events stream from Go backend (/geometry/toroid/stream)"
+              >
+                <Radio className="w-3 h-3" />
+                <span>SSE Stream</span>
+              </button>
             </div>
 
-            {/* Video Export & Save Actions */}
-            <div className="flex items-center space-x-2">
-              <select
-                value={exportFormat}
-                onChange={(e) => setExportFormat(e.target.value as any)}
-                className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] font-mono text-slate-300 focus:outline-none"
-              >
-                <option value="mp4">MP4 (Video)</option>
-                <option value="m4a">M4A (Video)</option>
-                <option value="webm">WebM (VP9)</option>
-              </select>
-
-              <button
-                onClick={handleExportAnimation}
-                disabled={isRecording}
-                className="px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-600/50 transition flex items-center space-x-1.5 text-xs font-mono shadow-sm"
-                title="Export high-definition video loop with no audio"
-              >
-                <Video className="w-3.5 h-3.5" />
-                <span>Export {exportFormat.toUpperCase()}</span>
-              </button>
-
+            {/* Utility Actions */}
+            <div className="flex items-center space-x-1.5">
               <button
                 onClick={handleCopyPath}
                 className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition"
@@ -727,30 +733,31 @@ export default function ToroidGeometryVisualizer({
               <button
                 onClick={handleSavePreset}
                 disabled={savingPreset}
-                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-400 border border-slate-800 transition"
-                title="Save Preset to Treasury Storehouse"
+                className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-amber-950/40 text-slate-300 hover:text-amber-300 border border-slate-800 hover:border-amber-500/30 transition flex items-center space-x-1 text-xs font-mono"
+                title="Save this continuous flow configuration to Treasury Storehouse"
               >
-                <BookmarkPlus className="w-3.5 h-3.5" />
+                <BookmarkPlus className="w-3.5 h-3.5 text-amber-400" />
+                <span>Save</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Right: Coloration & Wave Formulation Controls (5 cols) */}
+        {/* Right: Coloration & Wave Controls (5 cols) */}
         <div className="lg:col-span-5 space-y-5">
           {/* Palette & Circulation Wave Selector */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
             <h4 className="text-sm font-semibold text-white flex items-center justify-between border-b border-slate-800 pb-3">
               <span className="flex items-center gap-2">
                 <Music className="w-4 h-4 text-cyan-400" />
-                <span>Harmonic Color Spectrum</span>
+                <span>Continuous Harmonic Color Spectrum</span>
               </span>
               <span className="text-xs font-mono text-amber-400">Musica Universalis</span>
             </h4>
 
             {/* 1. Color Palette Buttons */}
             <div className="space-y-1.5">
-              <label className="text-xs text-slate-300 font-medium block">Frequency Spectrum Mode</label>
+              <label className="text-xs text-slate-300 font-medium block">Musical Noise Spectrum Mode</label>
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                 <button
                   onClick={() => setPalette("solfeggio")}
@@ -876,7 +883,7 @@ export default function ToroidGeometryVisualizer({
                 className="w-full accent-purple-500 bg-slate-800 rounded-lg cursor-pointer h-1.5"
               />
               <p className="text-[11px] text-slate-500">
-                Fills the diamond interference cells and spaces between lines with harmonic standing wave caustics.
+                Luminescent harmonic standing wave caustics breathing inside the spaces between lines.
               </p>
             </div>
 
@@ -1035,7 +1042,7 @@ export default function ToroidGeometryVisualizer({
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
               <span className="text-cyan-400 text-[11px] font-semibold block">ACOUSTIC CIRCULATION</span>
               <div className="text-slate-300 break-all text-[11px] font-mono">
-                W(k, t) = sin(2π · (m · k/N - t/T_loop)) [Harmonic Standing Wave]
+                W(k, t) = sin(2π · (m · k/N - phase(t))) [Infinite Monotonic Flow]
               </div>
             </div>
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
@@ -1045,9 +1052,9 @@ export default function ToroidGeometryVisualizer({
               </div>
             </div>
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
-              <span className="text-emerald-400 text-[11px] font-semibold block">SEAMLESS LOOP EQUILIBRIUM</span>
+              <span className="text-emerald-400 text-[11px] font-semibold block">MEMORY STABILITY POOL</span>
               <div className="text-slate-300 break-all text-[11px] font-mono">
-                Phase(t + T_loop) ≡ Phase(t) (mod 1.0) [Zero-Hitch Video Closure]
+                Allocations: 0 bytes/frame • Pre-compiled Path2D cache
               </div>
             </div>
           </div>

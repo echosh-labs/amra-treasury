@@ -270,3 +270,147 @@ func CalculateToroidGeometry(params ToroidParams) ToroidGeometryResult {
 		SacredPhilosophy: philosophy,
 	}
 }
+
+// HarmonicLineState represents the real-time continuous wave state for an individual filament.
+type HarmonicLineState struct {
+	Index       int     `json:"index"`
+	Hue         float64 `json:"hue"`
+	Saturation  float64 `json:"saturation"`
+	Lightness   float64 `json:"lightness"`
+	Opacity     float64 `json:"opacity"`
+	StrokeWidth float64 `json:"stroke_width"`
+	FrequencyHz float64 `json:"frequency_hz"`
+}
+
+// ContinuousHarmonicFrame encapsulates a live continuous flow frame computed by the engine.
+type ContinuousHarmonicFrame struct {
+	FrameIndex   int64               `json:"frame_index"`
+	TimestampSec float64             `json:"timestamp_sec"`
+	Phase        float64             `json:"phase"`
+	CausticLevel float64             `json:"caustic_level"`
+	LineStates   []HarmonicLineState `json:"line_states"`
+}
+
+var solfeggioBase = []struct {
+	Hz  float64
+	Hue float64
+}{
+	{174, 0},
+	{285, 30},
+	{396, 45},
+	{417, 90},
+	{528, 155},
+	{639, 195},
+	{741, 235},
+	{852, 275},
+	{963, 320},
+}
+
+// ComputeContinuousHarmonicFrame generates mathematical frequency states for N lines at continuous time tSec.
+func ComputeContinuousHarmonicFrame(
+	lineCount int,
+	tSec float64,
+	waveMode string,
+	multiplier int,
+	palette string,
+	frameIdx int64,
+) ContinuousHarmonicFrame {
+	if lineCount < 12 {
+		lineCount = 108
+	}
+	if multiplier < 1 {
+		multiplier = 1
+	}
+
+	phase := math.Mod(tSec*0.125, 1.0) // Continuous 8-second base cycle without discontinuities
+	if phase < 0 {
+		phase += 1.0
+	}
+
+	lineStates := make([]HarmonicLineState, lineCount)
+	caustic := (math.Sin(2*math.Pi*phase) + 1.0) * 0.5
+
+	for k := 0; k < lineCount; k++ {
+		frac := float64(k) / float64(lineCount)
+		var waveFactor float64
+
+		switch waveMode {
+		case "singularity_ingestion":
+			waveFactor = math.Cos(2 * math.Pi * (frac*2.0 + phase*float64(multiplier)))
+		case "standing_wave":
+			waveFactor = math.Sin(2*math.Pi*frac*float64(multiplier)) * math.Cos(2*math.Pi*phase)
+		case "doppler_vortex":
+			waveFactor = math.Sin(2 * math.Pi * (math.Pow(frac, 1.5)*float64(multiplier) - phase))
+		default: // "orbital_swirl"
+			waveFactor = math.Sin(2 * math.Pi * (frac*float64(multiplier) - phase))
+		}
+
+		var hue, sat, light float64
+		switch palette {
+		case "solfeggio":
+			solfLen := float64(len(solfeggioBase))
+			sIdx := math.Mod(frac*solfLen+phase*3.0, solfLen)
+			if sIdx < 0 {
+				sIdx += solfLen
+			}
+			i0 := int(sIdx)
+			i1 := (i0 + 1) % len(solfeggioBase)
+			mix := sIdx - float64(i0)
+			hue = solfeggioBase[i0].Hue*(1.0-mix) + solfeggioBase[i1].Hue*mix
+			sat = 90.0
+			light = 50.0 + waveFactor*18.0
+
+		case "pythagorean":
+			pythSteps := (k * 7) % 12
+			hue = math.Mod((float64(pythSteps)/12.0)*360.0+phase*180.0, 360.0)
+			sat = 80.0
+			light = 52.0 + waveFactor*15.0
+
+		case "synesthesia":
+			hue = math.Mod(frac*360.0+phase*360.0, 360.0)
+			sat = 95.0
+			light = 55.0 + waveFactor*15.0
+
+		case "bioluminescent":
+			hue = 155.0 + math.Mod((frac+phase), 1.0)*65.0
+			sat = 95.0
+			light = 58.0 + waveFactor*20.0
+
+		default: // "monochrome"
+			hue = 215.0
+			sat = 15.0
+			light = 65.0 + waveFactor*25.0
+		}
+
+		opacity := 0.20 + (waveFactor+1.0)*0.38
+		if opacity < 0.15 {
+			opacity = 0.15
+		} else if opacity > 0.98 {
+			opacity = 0.98
+		}
+
+		strokeW := 0.65 + math.Abs(waveFactor)*0.65
+
+		// Musical audio frequency mapping (174Hz to 963Hz logarithmic)
+		freqHz := 174.0 * math.Pow(963.0/174.0, frac)
+
+		lineStates[k] = HarmonicLineState{
+			Index:       k + 1,
+			Hue:         math.Round(hue*10) / 10,
+			Saturation:  math.Round(sat*10) / 10,
+			Lightness:   math.Round(light*10) / 10,
+			Opacity:     math.Round(opacity*100) / 100,
+			StrokeWidth: math.Round(strokeW*100) / 100,
+			FrequencyHz: math.Round(freqHz*10) / 10,
+		}
+	}
+
+	return ContinuousHarmonicFrame{
+		FrameIndex:   frameIdx,
+		TimestampSec: math.Round(tSec*1000) / 1000,
+		Phase:        math.Round(phase*1000) / 1000,
+		CausticLevel: math.Round(caustic*1000) / 1000,
+		LineStates:   lineStates,
+	}
+}
+

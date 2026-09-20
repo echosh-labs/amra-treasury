@@ -65,6 +65,7 @@ func RegisterRoutes(mux *http.ServeMux, handler *Handler) {
 	mux.HandleFunc("POST /api/v1/amra/geometry", handler.amraHandler.GeometryHandler)
 	mux.HandleFunc("GET /api/v1/amra/geometry/toroid", handler.amraHandler.ToroidGeometryHandler)
 	mux.HandleFunc("POST /api/v1/amra/geometry/toroid", handler.amraHandler.ToroidGeometryHandler)
+	mux.HandleFunc("GET /api/v1/amra/geometry/toroid/stream", handler.amraHandler.ToroidStreamHandler)
 	mux.HandleFunc("GET /api/v1/amra/artwork", handler.amraHandler.ArtworkCatalogHandler)
 	mux.HandleFunc("POST /api/v1/amra/artwork", handler.amraHandler.ArtworkCatalogHandler)
 	mux.HandleFunc("GET /api/v1/amra/gcloud/status", handler.amraHandler.GCloudStatusHandler)
