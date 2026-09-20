@@ -28,17 +28,28 @@ export default function YouTubeDispatchModal({
   manifest,
 }: YouTubeDispatchModalProps) {
   const [title, setTitle] = useState<string>(
-    "Āmra Anāhata Meditation | 432Hz Sacred Geometry Toroid"
+    manifest?.title || "Āmra Anāhata Meditation | 432Hz Sacred Geometry Toroid"
   );
   const [description, setDescription] = useState<string>(
-    "Sacred Geometry Toroidal visualization with Āmra Rūpa Mango focal mandala. Frequency calibrated to 432Hz harmonic heart resonance for deep yoga nidra and focused contemplation."
+    manifest?.description ||
+      "Sacred Geometry Toroidal visualization with focal mandala. Frequency calibrated to 432Hz harmonic heart resonance for deep yoga nidra and focused contemplation."
   );
   const [tags, setTags] = useState<string>(
-    "sacred geometry, amra, meditation, 432hz, sound healing, toroid, mandala"
+    Array.isArray(manifest?.tags) && manifest.tags.length > 0
+      ? manifest.tags.join(", ")
+      : "sacred geometry, amra, meditation, 432hz, sound healing, toroid, mandala"
   );
   const [privacyStatus, setPrivacyStatus] = useState<"private" | "unlisted" | "public">(
     "unlisted"
   );
+
+  useEffect(() => {
+    if (manifest?.title) setTitle(manifest.title);
+    if (manifest?.description) setDescription(manifest.description);
+    if (Array.isArray(manifest?.tags) && manifest.tags.length > 0) {
+      setTags(manifest.tags.join(", "));
+    }
+  }, [manifest]);
 
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<string>("idle");

@@ -34,6 +34,28 @@ export default function StudioPage() {
   // Geometry Backdrop State
   const [backdropStyle, setBackdropStyle] = useState<string>("torus_flower_of_life");
   const [palette, setPalette] = useState<string>("amra_multivariate");
+  const [availablePresets, setAvailablePresets] = useState<any[]>([
+    { id: "torus_flower_of_life", name: "Flower Torus" },
+    { id: "singularity_vortex", name: "Singularity Vortex" },
+    { id: "metatron_cube", name: "Metatron Cube" },
+  ]);
+
+  useEffect(() => {
+    const fetchCatalog = async () => {
+      try {
+        const res = await fetch("/api/v1/amra/artwork");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.catalog) && data.catalog.length > 0) {
+            setAvailablePresets(data.catalog);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch dynamic artwork presets:", err);
+      }
+    };
+    fetchCatalog();
+  }, []);
 
   // Track States
   const [objectTrack, setObjectTrack] = useState<ObjectTrackState>({
@@ -249,40 +271,22 @@ export default function StudioPage() {
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => setBackdropStyle("torus_flower_of_life")}
-                className={`p-2 rounded-xl border text-center transition-all ${
-                  backdropStyle === "torus_flower_of_life"
-                    ? "bg-purple-500/20 border-purple-500 text-purple-200 font-semibold"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                Flower Torus
-              </button>
-              <button
-                type="button"
-                onClick={() => setBackdropStyle("singularity_vortex")}
-                className={`p-2 rounded-xl border text-center transition-all ${
-                  backdropStyle === "singularity_vortex"
-                    ? "bg-purple-500/20 border-purple-500 text-purple-200 font-semibold"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                Singularity Vortex
-              </button>
-              <button
-                type="button"
-                onClick={() => setBackdropStyle("metatron_cube")}
-                className={`p-2 rounded-xl border text-center transition-all ${
-                  backdropStyle === "metatron_cube"
-                    ? "bg-purple-500/20 border-purple-500 text-purple-200 font-semibold"
-                    : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                Metatron Cube
-              </button>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+              {availablePresets.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setBackdropStyle(preset.id)}
+                  className={`p-2 rounded-xl border text-center transition-all truncate ${
+                    backdropStyle === preset.id
+                      ? "bg-purple-500/20 border-purple-500 text-purple-200 font-semibold shadow-inner"
+                      : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                  }`}
+                  title={preset.name}
+                >
+                  {preset.name.split(" ")[0]} {preset.name.split(" ")[1] || ""}
+                </button>
+              ))}
             </div>
           </div>
         </div>

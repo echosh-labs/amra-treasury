@@ -452,61 +452,41 @@ func (h *Handler) ToroidStreamHandler(w http.ResponseWriter, r *http.Request) {
 
 // ArtworkCatalogHandler returns all available sacred artworks in the AMRA Treasury Storehouse.
 func (h *Handler) ArtworkCatalogHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		// Save new preset to toroid artwork document
-		var newPreset db.ToroidPresetDoc
-		if err := json.NewDecoder(r.Body).Decode(&newPreset); err != nil {
-			http.Error(w, `{"error":"invalid preset payload"}`, http.StatusBadRequest)
+	if r.Method == http.MethodPost || r.Method == http.MethodPut {
+		var doc ArtworkDoc
+		if err := json.NewDecoder(r.Body).Decode(&doc); err != nil {
+			http.Error(w, `{"error":"invalid artwork payload"}`, http.StatusBadRequest)
 			return
 		}
-		if newPreset.ID == "" {
-			newPreset.ID = fmt.Sprintf("preset_%d", time.Now().Unix())
+		if doc.ID == "" {
+			doc.ID = fmt.Sprintf("artwork_%d", time.Now().Unix())
 		}
-		if newPreset.Name == "" {
-			newPreset.Name = "Custom Torus Preset"
+		if doc.Name == "" {
+			doc.Name = "Custom Sacred Artwork"
+		}
+		if doc.Category == "" {
+			doc.Category = "sacred_geometry"
 		}
 
-		doc, _ := h.engine.GetToroidArtwork()
-		if doc == nil {
-			d := db.DefaultToroidArtworkDoc()
-			doc = &d
-		}
-		doc.Presets = append(doc.Presets, newPreset)
-		if err := h.engine.SaveToroidArtwork(doc); err != nil {
-			http.Error(w, `{"error":"failed to persist preset"}`, http.StatusInternalServerError)
+		if err := h.engine.SaveArtwork(doc); err != nil {
+			http.Error(w, fmt.Sprintf(`{"error":"failed to persist artwork: %s"}`, err.Error()), http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"status": "saved",
-			"preset": newPreset,
+			"status":  "saved",
+			"artwork": doc,
 		})
 		return
 	}
 
-	// GET: Return entire artwork catalog
-	toroidDoc, _ := h.engine.GetToroidArtwork()
-	philosophy, _ := h.engine.GetAmraPhilosophy()
-
-	catalog := []map[string]any{
-		{
-			"id":          "toroid_singularity",
-			"name":        "Toroidal Singularity (Akasha Spanda)",
-			"category":    "sacred_geometry",
-			"description": "Circumscribed precessing filaments forming an event horizon black hole void with intentional non-closing miss margin.",
-			"endpoint":    "/api/v1/amra/geometry/toroid",
-			"metadata":    toroidDoc,
-		},
-		{
-			"id":          "amra_mango",
-			"name":        "Āmra Rūpa & Shadow Alchemy (Jnana-Phala)",
-			"category":    "sacred_geometry",
-			"description": "Parametric Kairi curve with indestructible Bīja seed and Arishadvarga shadow transmutation.",
-			"endpoint":    "/api/v1/amra/geometry",
-			"metadata":    philosophy,
-		},
+	// GET: Return entire dynamic artwork catalog (filtered by optional ?tag=)
+	tagFilter := r.URL.Query().Get("tag")
+	catalog, err := h.engine.GetArtworkCatalog(tagFilter)
+	if err != nil {
+		catalog = DefaultArtworkCatalog()
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -514,6 +494,7 @@ func (h *Handler) ArtworkCatalogHandler(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"catalog": catalog,
 		"count":   len(catalog),
+		"filter":  tagFilter,
 	})
 }
 
