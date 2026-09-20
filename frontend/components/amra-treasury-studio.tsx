@@ -14,8 +14,7 @@ import {
   Cloud,
   ArrowUpRight,
   Circle,
-  Layers,
-  Palette,
+  ExternalLink,
 } from "lucide-react";
 import { useYouTubeStudio } from "@/lib/youtube-context";
 import { useToast } from "@/lib/toast-context";
@@ -25,7 +24,6 @@ import {
   LedgerTransaction,
   FinancialReport,
   EsotericPhilosophy,
-  AmraGeometryData,
   GCloudBillingResponse,
 } from "@/lib/types/treasury";
 import { fetchAmraPhilosophy } from "@/lib/esoteric";
@@ -34,15 +32,13 @@ import GCloudBurnRateCard from "./treasury/gcloud-burn-rate-card";
 import YouTubeRevenueCard from "./treasury/youtube-revenue-card";
 import AMRALedgerTable from "./treasury/amra-ledger-table";
 import AMRASubscriptionGrid from "./treasury/amra-subscription-grid";
-import MangoGeometryVisualizer from "./treasury/mango-geometry-visualizer";
-import ToroidGeometryVisualizer from "./treasury/toroid-geometry-visualizer";
 
 export default function AMRATreasuryStudio() {
   const { status: ytStatus } = useYouTubeStudio();
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [activeSubTab, setActiveSubTab] = useState<
-    "overview" | "youtube_finance" | "ledger" | "plans" | "geometry" | "gcloud_billing"
+    "overview" | "youtube_finance" | "ledger" | "plans" | "gcloud_billing"
   >("overview");
 
   // Core Treasury State
@@ -56,15 +52,6 @@ export default function AMRATreasuryStudio() {
   const [gcloudBilling, setGcloudBilling] = useState<GCloudBillingResponse | null>(null);
   const [loadingGCloud, setLoadingGCloud] = useState(false);
   const [syncingGCloud, setSyncingGCloud] = useState(false);
-
-  // Sacred Geometry & Shadow Alchemy State
-  const [geoBelly, setGeoBelly] = useState(125);
-  const [geoHook, setGeoHook] = useState(35);
-  const [geoShadow, setGeoShadow] = useState(0.40);
-  const [geoHeat, setGeoHeat] = useState(0.80);
-  const [geoData, setGeoData] = useState<AmraGeometryData | null>(null);
-  const [loadingGeo, setLoadingGeo] = useState(false);
-  const [artworkView, setArtworkView] = useState<"toroid" | "mango" | "dual">("toroid");
 
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [loadingLedger, setLoadingLedger] = useState(false);
@@ -125,82 +112,52 @@ export default function AMRATreasuryStudio() {
     }
   }, [ytStatus?.authenticated]);
 
-  useEffect(() => {
-    loadAMRAMetrics();
-    loadLedger();
-  }, [loadAMRAMetrics, loadLedger]);
-
-  useEffect(() => {
-    loadYouTubeFinance();
-  }, [loadYouTubeFinance]);
-
-  // Load Sacred Geometry and Shadow Alchemy
-  const loadGeometry = useCallback(
-    async (belly = geoBelly, hook = geoHook, shadow = geoShadow, heat = geoHeat) => {
-      setLoadingGeo(true);
-      try {
-        const res = await fetch(
-          `/api/v1/amra/geometry?rx=${belly}&hook=${hook}&shadow=${shadow}&heat=${heat}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setGeoData(data);
-          if (data.philosophy) {
-            setPhilosophy(data.philosophy);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load AMRA geometry:", err);
-      } finally {
-        setLoadingGeo(false);
-      }
-    },
-    [geoBelly, geoHook, geoShadow, geoHeat]
-  );
-
-  useEffect(() => {
-    if (activeSubTab === "geometry") {
-      loadGeometry();
-    }
-  }, [activeSubTab, loadGeometry]);
-
-  // Load Google Cloud Billing & Infrastructure telemetry
+  // Fetch Google Cloud Billing telemetry
   const loadGCloudBilling = useCallback(async () => {
     setLoadingGCloud(true);
     try {
       const res = await fetch("/api/v1/amra/gcloud/billing");
       if (res.ok) {
-        const data = await res.json();
-        setGcloudBilling(data);
+        setGcloudBilling(await res.json());
       }
     } catch (err) {
-      console.error("Failed to load GCloud billing:", err);
+      console.error("Failed to load Google Cloud billing data:", err);
     } finally {
       setLoadingGCloud(false);
     }
   }, []);
 
   useEffect(() => {
-    if (activeSubTab === "gcloud_billing") {
-      loadGCloudBilling();
-    }
-  }, [activeSubTab, loadGCloudBilling]);
+    loadAMRAMetrics();
+    loadLedger();
+    loadGCloudBilling();
+  }, [loadAMRAMetrics, loadLedger, loadGCloudBilling]);
 
-  // Sync GCloud monthly infrastructure expense to immutable AMRA ledger
+  useEffect(() => {
+    loadYouTubeFinance();
+  }, [loadYouTubeFinance]);
+
+  // Sync GCloud expense to BoltDB Ledger
   const handleSyncGCloudExpense = async () => {
     setSyncingGCloud(true);
     try {
-      const res = await fetch("/api/v1/amra/gcloud/sync-ledger", { method: "POST" });
+      const res = await fetch("/api/v1/amra/gcloud/sync-ledger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          period_days: 30,
+          description: "Google Cloud Infrastructure Auto-Reconciliation",
+        }),
+      });
       if (res.ok) {
         const data = await res.json();
-        const amt = Math.abs(data.transaction?.amount_cents || 0) / 100;
-        toastSuccess(`Committed cloud infrastructure expense ($${amt.toFixed(2)}) to ledger`);
-        await loadGCloudBilling();
+        toastSuccess(`Reconciled $${(data.recorded_amount || 0).toFixed(2)} to audit ledger`);
         await loadAMRAMetrics();
         await loadLedger();
+        await loadGCloudBilling();
       } else {
         const err = await res.json();
-        toastError(`Failed to sync expense: ${err.error || "Unknown error"}`);
+        toastError(`Sync failed: ${err.error || "Unknown error"}`);
       }
     } catch (err: any) {
       toastError(`Sync error: ${err.message}`);
@@ -209,11 +166,15 @@ export default function AMRATreasuryStudio() {
     }
   };
 
-  // Sync YouTube revenue directly into AMRA ledger
-  const handleSyncToAMRA = async () => {
+  // Sync YouTube Partner Revenue to BoltDB Ledger
+  const handleSyncToAMRA = async (month?: string) => {
     setSyncingAMRA(true);
     try {
-      const res = await fetch("/api/v1/youtube/finance/sync-amra", { method: "POST" });
+      const res = await fetch("/api/v1/youtube/finance/sync-amra", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ month }),
+      });
       if (res.ok) {
         const data = await res.json();
         toastSuccess(
@@ -270,7 +231,7 @@ export default function AMRATreasuryStudio() {
               </span>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-bold text-white tracking-tight">
+                  <h2 className="text-xl font-bold text-white tracking-tight font-serif">
                     AMRA Sovereign Treasury
                   </h2>
                   <span
@@ -300,6 +261,7 @@ export default function AMRATreasuryStudio() {
                 loadAMRAMetrics();
                 loadLedger();
                 loadYouTubeFinance();
+                loadGCloudBilling();
               }}
               className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono flex items-center space-x-1.5 border border-slate-700 transition"
               title="Refresh Telemetry"
@@ -374,18 +336,6 @@ export default function AMRATreasuryStudio() {
         </button>
 
         <button
-          onClick={() => setActiveSubTab("geometry")}
-          className={`px-4 py-2 rounded-lg transition flex items-center space-x-1.5 ${
-            activeSubTab === "geometry"
-              ? "bg-slate-800 text-amber-300 border border-slate-700 font-semibold"
-              : "text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Palette className="w-3.5 h-3.5 text-amber-400" />
-          <span>Sacred Artwork Atelier</span>
-        </button>
-
-        <button
           onClick={() => setActiveSubTab("gcloud_billing")}
           className={`px-4 py-2 rounded-lg transition flex items-center space-x-1.5 ${
             activeSubTab === "gcloud_billing"
@@ -428,55 +378,66 @@ export default function AMRATreasuryStudio() {
               <div className="p-3.5 bg-slate-950/70 border border-slate-800/80 rounded-lg flex items-center justify-between">
                 <div>
                   <div className="text-slate-200 font-semibold">Tier 2: YouTube Partner Ad Revenue</div>
-                  <div className="text-[11px] text-slate-400">Ad impressions, monetized playbacks, &amp; Red subscriptions</div>
+                  <div className="text-[11px] text-slate-400">Autonomous creator channel video monetization</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-red-300">
-                    ${(metrics?.youtube_accrued_30d || finance?.total_estimated_revenue || 0).toFixed(2)}
+                  <div className="text-sm font-bold text-emerald-300">
+                    ${(finance?.total_estimated_revenue || 0).toFixed(2)}
                   </div>
-                  <div className="text-[10px] text-slate-500">YouTube Analytics API v2</div>
+                    <div className="text-[10px] text-slate-500">
+                      {finance?.monetized ? "Monetized Partner Channel" : "Autonomous Estimates"}
+                    </div>
+                  </div>
                 </div>
-              </div>
             </div>
 
             <div className="p-3 bg-emerald-950/30 border border-emerald-800/40 rounded-lg text-xs text-slate-300 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>All transactions recorded with SHA-256 deduplication in BoltDB.</span>
-              </div>
-              <button
-                onClick={handleSyncToAMRA}
-                disabled={syncingAMRA || !ytStatus?.authenticated}
-                className="px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition flex items-center space-x-1"
-              >
-                <RefreshCw className={`w-3 h-3 ${syncingAMRA ? "animate-spin" : ""}`} />
-                <span>Sync YouTube to Ledger</span>
-              </button>
+              <span className="text-emerald-400 font-mono">Consolidated Gross Ecosystem:</span>
+              <span className="font-bold text-emerald-300 font-mono">
+                ${((metrics?.total_gross_ecosystem || 0) / 100).toFixed(2)}
+              </span>
             </div>
           </div>
 
-          {/* Dedicated Foundations Studio Hub Card */}
+          {/* YouTube Studio Integration Health */}
           <div className="p-5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-4 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="text-sm font-semibold text-white flex items-center space-x-2">
                   <Video className="w-4 h-4 text-red-400" />
-                  <span>Foundations Production Hub</span>
+                  <span>Foundations YouTube Channel</span>
                 </h3>
-                <span className="text-xs font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800">
-                  Dedicated Route
-                </span>
+                <span className="text-xs font-mono text-red-400">OAuth Substrate</span>
               </div>
 
-              <div className="space-y-2.5 mt-3">
-                <p className="text-xs text-slate-300 leading-relaxed font-sans">
-                  The Foundations Creator Studio is decoupled into its own sovereign workspace for channel management, timeline manifest compilation, direct video uploading, and audience retention telemetry.
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+              <div className="space-y-3 font-mono text-xs mt-3">
+                <div className="p-3.5 bg-slate-950/70 border border-slate-800/80 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        ytStatus?.authenticated ? "bg-emerald-400 animate-pulse" : "bg-red-400"
+                      }`}
+                    />
+                    <span className="text-slate-200">
+                      {ytStatus?.channel?.title || "Unauthenticated Channel"}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-[11px] px-2 py-0.5 rounded border ${
+                      ytStatus?.authenticated
+                        ? "bg-emerald-950 text-emerald-400 border-emerald-800"
+                        : "bg-red-950 text-red-400 border-red-800"
+                    }`}
+                  >
+                    {ytStatus?.authenticated ? "CONNECTED" : "DISCONNECTED"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
                   <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-lg">
-                    <span className="text-slate-400 uppercase text-[10px] block">Channel Status</span>
-                    <span className={`font-semibold text-xs ${ytStatus?.authenticated ? "text-emerald-400" : "text-amber-300"}`}>
-                      {ytStatus?.authenticated ? "Connected" : "OAuth Pending"}
+                    <span className="text-slate-400 uppercase text-[10px] block">Subscriber Reach</span>
+                    <span className="font-semibold text-xs text-white">
+                      {ytStatus?.channel?.subscriber_count?.toLocaleString() || "0"}
                     </span>
                   </div>
                   <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-lg">
@@ -499,47 +460,77 @@ export default function AMRATreasuryStudio() {
             </Link>
           </div>
 
-          {/* Vedic Philosophy Card */}
-          <div className="lg:col-span-2 p-4 rounded-xl bg-gradient-to-r from-amber-950/20 via-slate-900/80 to-emerald-950/20 border border-amber-500/20 text-xs flex flex-col justify-between">
-            <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/10 pb-2">
-                <div className="flex items-center space-x-2">
-                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-serif text-amber-300 font-semibold text-sm">
-                    {philosophy?.title || "Vedic Philosophy of Āmra (आम्र)"}
-                    {philosophy?.subtitle ? ` • ${philosophy.subtitle}` : ""}
-                  </span>
-                </div>
-                <span className="font-mono text-[10px] text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 self-start sm:self-auto">
-                  Sovereign Fruition
+          {/* Sacred Artwork Atelier Bridges */}
+          <div className="lg:col-span-2 p-5 rounded-2xl bg-gradient-to-r from-amber-950/20 via-slate-900/90 to-cyan-950/20 border border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="font-serif text-white font-semibold text-sm">
+                  {philosophy?.title || "Vedic Philosophy of Āmra (आम्र)"}
+                  {philosophy?.subtitle ? ` • ${philosophy.subtitle}` : ""}
                 </span>
               </div>
-              <div className="text-slate-400 text-xs leading-relaxed mt-2.5 font-sans">
-                {philosophy?.karma_phala ? (
-                  <p className="space-y-1">
-                    <span className="text-slate-300 font-medium block">{philosophy.karma_phala}</span>
-                    {philosophy.purna_kumbha && (
-                      <span className="text-emerald-300/90 block">{philosophy.purna_kumbha}</span>
-                    )}
-                  </p>
-                ) : (
-                  <span className="text-slate-500 italic">
-                    Hydrating sovereign Vedic philosophy from storehouse...
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-amber-500/10 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] font-mono text-slate-400">
-                Parametric Kairi curve, Golden Ratio spiral &amp; Samudra Manthan shadow transmutation
+              <span className="font-mono text-[10px] text-amber-400/80 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 self-start sm:self-auto">
+                Sovereign Fruition Substrate
               </span>
-              <button
-                onClick={() => setActiveSubTab("geometry")}
-                className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-mono flex items-center space-x-1.5 transition"
+            </div>
+
+            <div className="text-slate-400 text-xs leading-relaxed font-sans">
+              {philosophy?.karma_phala ? (
+                <p className="space-y-1">
+                  <span className="text-slate-300 font-medium block">{philosophy.karma_phala}</span>
+                  {philosophy.purna_kumbha && (
+                    <span className="text-emerald-300/90 block">{philosophy.purna_kumbha}</span>
+                  )}
+                </p>
+              ) : (
+                <span className="text-slate-500 italic">
+                  Hydrating sovereign Vedic philosophy from storehouse...
+                </span>
+              )}
+            </div>
+
+            {/* Quick Navigation Cards into Dedicated Artwork Pages */}
+            <div className="pt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Link
+                href="/sacred-geometry"
+                className="p-3.5 rounded-xl bg-cyan-950/30 hover:bg-cyan-950/60 border border-cyan-500/30 hover:border-cyan-400/50 transition-all flex items-center justify-between group"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Explore Sacred Geometry &amp; Shadow Alchemy →</span>
-              </button>
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
+                    <Circle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white group-hover:text-cyan-300 transition-colors">
+                      Sacred Geometrical Backgrounds
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Toroidal Harmonics • 25 Multivariate Facets
+                    </div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-cyan-400/70 group-hover:text-cyan-300 transition-colors" />
+              </Link>
+
+              <Link
+                href="/sacred-objects"
+                className="p-3.5 rounded-xl bg-amber-950/30 hover:bg-amber-950/60 border border-amber-500/30 hover:border-amber-400/50 transition-all flex items-center justify-between group"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-white group-hover:text-amber-300 transition-colors">
+                      Sacred Graphical Objects
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400">
+                      Āmra Rūpa Mango • Living Prānic Expressions
+                    </div>
+                  </div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-amber-400/70 group-hover:text-amber-300 transition-colors" />
+              </Link>
             </div>
           </div>
         </div>
@@ -569,147 +560,7 @@ export default function AMRATreasuryStudio() {
         <AMRASubscriptionGrid plans={plans} onCheckout={handleCheckout} />
       )}
 
-      {/* 7. Sub-View: Sacred Artwork Atelier (Toroidal Singularity & Āmra Rūpa) */}
-      {activeSubTab === "geometry" && (
-        <div className="space-y-6">
-          {/* Gallery Mode Selector Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 gap-3">
-            <div className="flex items-center flex-wrap gap-2">
-              <span className="text-xs font-mono text-slate-400 pl-2">ARTWORK:</span>
-              <button
-                onClick={() => setArtworkView("toroid")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center space-x-1.5 transition ${
-                  artworkView === "toroid"
-                    ? "bg-slate-800 text-cyan-300 border border-slate-700 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Circle className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Toroidal Singularity (Spanda)</span>
-              </button>
-
-              <button
-                onClick={() => setArtworkView("mango")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center space-x-1.5 transition ${
-                  artworkView === "mango"
-                    ? "bg-slate-800 text-amber-300 border border-slate-700 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Āmra Rūpa &amp; Shadow Alchemy</span>
-              </button>
-
-              <button
-                onClick={() => setArtworkView("dual")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono flex items-center space-x-1.5 transition ${
-                  artworkView === "dual"
-                    ? "bg-slate-800 text-purple-300 border border-slate-700 font-semibold shadow-sm"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5 text-purple-400" />
-                <span>Dual Atelier View</span>
-              </button>
-            </div>
-
-            <div className="text-[11px] font-mono text-slate-500 pr-2 hidden md:block">
-              Vedic &amp; Parametric Mathematical Artworks
-            </div>
-          </div>
-
-          {/* Artwork Displays */}
-          {artworkView === "toroid" && <ToroidGeometryVisualizer />}
-
-          {artworkView === "mango" && (
-            <MangoGeometryVisualizer
-              geoBelly={geoBelly}
-              geoHook={geoHook}
-              geoShadow={geoShadow}
-              geoHeat={geoHeat}
-              geoData={geoData}
-              loadingGeo={loadingGeo}
-              onBellyChange={(v) => {
-                setGeoBelly(v);
-                loadGeometry(v, geoHook, geoShadow, geoHeat);
-              }}
-              onHookChange={(v) => {
-                setGeoHook(v);
-                loadGeometry(geoBelly, v, geoShadow, geoHeat);
-              }}
-              onShadowChange={(v) => {
-                setGeoShadow(v);
-                loadGeometry(geoBelly, geoHook, v, geoHeat);
-              }}
-              onHeatChange={(v) => {
-                setGeoHeat(v);
-                loadGeometry(geoBelly, geoHook, geoShadow, v);
-              }}
-              onPreset={(b, h, s, t) => {
-                setGeoBelly(b);
-                setGeoHook(h);
-                setGeoShadow(s);
-                setGeoHeat(t);
-                loadGeometry(b, h, s, t);
-              }}
-              onReload={() => loadGeometry()}
-            />
-          )}
-
-          {artworkView === "dual" && (
-            <div className="space-y-8">
-              <div className="border-b border-slate-800 pb-2">
-                <h4 className="text-sm font-semibold text-cyan-300 font-mono flex items-center gap-2">
-                  <Circle className="w-4 h-4 text-cyan-400" />
-                  <span>I. Toroidal Singularity &amp; Akasha Vortex</span>
-                </h4>
-              </div>
-              <ToroidGeometryVisualizer />
-
-              <div className="border-b border-slate-800 pb-2 pt-6">
-                <h4 className="text-sm font-semibold text-amber-300 font-mono flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>II. Āmra Rūpa (Sacred Mango) &amp; Shadow Alchemy</span>
-                </h4>
-              </div>
-              <MangoGeometryVisualizer
-                geoBelly={geoBelly}
-                geoHook={geoHook}
-                geoShadow={geoShadow}
-                geoHeat={geoHeat}
-                geoData={geoData}
-                loadingGeo={loadingGeo}
-                onBellyChange={(v) => {
-                  setGeoBelly(v);
-                  loadGeometry(v, geoHook, geoShadow, geoHeat);
-                }}
-                onHookChange={(v) => {
-                  setGeoHook(v);
-                  loadGeometry(geoBelly, v, geoShadow, geoHeat);
-                }}
-                onShadowChange={(v) => {
-                  setGeoShadow(v);
-                  loadGeometry(geoBelly, geoHook, v, geoHeat);
-                }}
-                onHeatChange={(v) => {
-                  setGeoHeat(v);
-                  loadGeometry(geoBelly, geoHook, geoShadow, v);
-                }}
-                onPreset={(b, h, s, t) => {
-                  setGeoBelly(b);
-                  setGeoHook(h);
-                  setGeoShadow(s);
-                  setGeoHeat(t);
-                  loadGeometry(b, h, s, t);
-                }}
-                onReload={() => loadGeometry()}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 8. Sub-View: Google Cloud Infrastructure & Billing */}
+      {/* 7. Sub-View: Google Cloud Infrastructure & Billing */}
       {activeSubTab === "gcloud_billing" && (
         <GCloudBurnRateCard
           gcloudBilling={gcloudBilling}

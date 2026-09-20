@@ -10,6 +10,7 @@ import { YouTubeStudioProvider } from "@/lib/youtube-context";
 import { ToastProvider } from "@/lib/toast-context";
 import YouTubeStudioDock from "@/components/youtube-studio-dock";
 import AmraFooter from "@/components/amra-footer";
+import AmraNavigation from "@/components/amra-navigation";
 
 export default function RootLayout({
   children,
@@ -43,6 +44,7 @@ export default function RootLayout({
                 </div>
               </div>
             </header>
+            <AmraNavigation />
             <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
               {children}
             </main>

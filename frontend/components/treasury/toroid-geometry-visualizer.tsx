@@ -28,6 +28,9 @@ import {
   Eye,
   Sun,
   Moon,
+  Maximize2,
+  Minimize2,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   ToroidParams,
@@ -40,6 +43,8 @@ import { useToast } from "@/lib/toast-context";
 interface ToroidGeometryVisualizerProps {
   onPresetSelect?: (preset: ToroidPreset) => void;
 }
+
+export type BackdropStyle = "obsidian" | "cosmic_aurora" | "emerald_matrix" | "solar_corona";
 
 export type HarmonicColorPalette =
   | "multivariate_facets"
@@ -266,6 +271,8 @@ export default function ToroidGeometryVisualizer({
   const [speedMultiplier, setSpeedMultiplier] = useState<number>(1.0);
   const [flowDirection, setFlowDirection] = useState<1 | -1>(1);
   const [engineMode, setEngineMode] = useState<EngineMode>("client_gpu");
+  const [backdropStyle, setBackdropStyle] = useState<BackdropStyle>("obsidian");
+  const [fullBleed, setFullBleed] = useState<boolean>(false);
 
   // Telemetry display (throttled to 2 Hz to guarantee zero React memory churn)
   const [displayFps, setDisplayFps] = useState<number>(60);
@@ -317,6 +324,7 @@ export default function ToroidGeometryVisualizer({
     ],
     compiledFacets: [] as CompiledFacet[],
     facetDistribution: "interlaced_weave" as FacetDistributionMode,
+    backdropStyle: "obsidian" as BackdropStyle,
   });
 
   // Multi-Facet toggle helpers
@@ -405,6 +413,7 @@ export default function ToroidGeometryVisualizer({
     engineStateRef.current.spectrumStopsRgb = specRgb;
     engineStateRef.current.compiledFacets = compiledFacets;
     engineStateRef.current.facetDistribution = facetDistribution;
+    engineStateRef.current.backdropStyle = backdropStyle;
   }, [
     isPlaying,
     speedMultiplier,
@@ -422,6 +431,7 @@ export default function ToroidGeometryVisualizer({
     customSpectrumStops,
     activeFacetIds,
     facetDistribution,
+    backdropStyle,
   ]);
 
   // Solfeggio 9 Frequencies (Hz -> Hue)
@@ -610,8 +620,28 @@ export default function ToroidGeometryVisualizer({
       if (tData) {
         ctx.save();
 
-        // 1. Deep Space Obsidian Background
-        ctx.fillStyle = "#020617";
+        // 1. Deep Space Obsidian / Ambient Auroral Wallpaper Background
+        if (state.backdropStyle === "cosmic_aurora") {
+          const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 20, width / 2, height / 2, Math.max(width, height) * 0.75);
+          bgGrad.addColorStop(0, "#1f0f38");
+          bgGrad.addColorStop(0.5, "#0d061c");
+          bgGrad.addColorStop(1, "#020617");
+          ctx.fillStyle = bgGrad;
+        } else if (state.backdropStyle === "emerald_matrix") {
+          const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 20, width / 2, height / 2, Math.max(width, height) * 0.75);
+          bgGrad.addColorStop(0, "#063024");
+          bgGrad.addColorStop(0.5, "#021610");
+          bgGrad.addColorStop(1, "#020617");
+          ctx.fillStyle = bgGrad;
+        } else if (state.backdropStyle === "solar_corona") {
+          const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 20, width / 2, height / 2, Math.max(width, height) * 0.75);
+          bgGrad.addColorStop(0, "#381400");
+          bgGrad.addColorStop(0.5, "#1c0700");
+          bgGrad.addColorStop(1, "#020617");
+          ctx.fillStyle = bgGrad;
+        } else {
+          ctx.fillStyle = "#020617";
+        }
         ctx.fillRect(0, 0, width, height);
 
         // Center coordinates
@@ -1011,6 +1041,17 @@ export default function ToroidGeometryVisualizer({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Export PNG Wallpaper Snapshot
+  const handleExportPng = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.download = `sacred_torus_wallpaper_${Date.now()}.png`;
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+    toastSuccess("Downloaded PNG wallpaper snapshot");
+  };
+
   // Save Preset to BoltDB Storehouse
   const handleSavePreset = async () => {
     setSavingPreset(true);
@@ -1121,14 +1162,81 @@ export default function ToroidGeometryVisualizer({
             </div>
           </div>
 
+          {/* Backdrop Atmosphere & Wallpaper Controls */}
+          <div className="w-full flex items-center justify-between mb-2.5 px-1 text-[11px] font-mono">
+            <div className="flex items-center gap-1">
+              <span className="text-slate-500 text-[10px]">ATMOSPHERE:</span>
+              {[
+                { id: "obsidian", label: "Void" },
+                { id: "cosmic_aurora", label: "Cosmic" },
+                { id: "emerald_matrix", label: "Emerald" },
+                { id: "solar_corona", label: "Solar" },
+              ].map((b) => (
+                <button
+                  key={b.id}
+                  onClick={() => setBackdropStyle(b.id as BackdropStyle)}
+                  className={`px-2 py-0.5 rounded text-[10px] transition ${
+                    backdropStyle === b.id
+                      ? "bg-slate-800 text-cyan-300 border border-cyan-500/30 font-semibold"
+                      : "text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleExportPng}
+                className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 flex items-center gap-1 text-[10px] transition"
+                title="Download 4K/HD Wallpaper Snapshot (PNG)"
+              >
+                <ImageIcon className="w-3 h-3 text-cyan-400" />
+                <span>PNG Wallpaper</span>
+              </button>
+              <button
+                onClick={() => setFullBleed(!fullBleed)}
+                className={`p-1 rounded border transition text-[10px] flex items-center gap-1 ${
+                  fullBleed
+                    ? "bg-cyan-950 text-cyan-300 border-cyan-500"
+                    : "bg-slate-900 text-slate-400 hover:text-white border-slate-800"
+                }`}
+                title={fullBleed ? "Exit Full Bleed View" : "Full Bleed Ambient Background"}
+              >
+                {fullBleed ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+              </button>
+            </div>
+          </div>
+
           {/* Canvas Rendering Port */}
-          <div className="w-full aspect-square max-w-[480px] relative flex items-center justify-center p-2 rounded-2xl bg-black border border-slate-900 shadow-2xl overflow-hidden">
+          <div className={`w-full aspect-square relative flex items-center justify-center p-2 rounded-2xl bg-black border border-slate-900 shadow-2xl overflow-hidden transition-all ${
+            fullBleed ? "fixed inset-0 z-50 max-w-none w-screen h-screen rounded-none border-none p-0" : "max-w-[480px]"
+          }`}>
             <canvas
               ref={canvasRef}
-              width={640}
-              height={640}
-              className="w-full h-full object-contain rounded-xl select-none"
+              width={fullBleed ? 1280 : 640}
+              height={fullBleed ? 1280 : 640}
+              className="w-full h-full object-contain select-none"
             />
+            {fullBleed && (
+              <div className="absolute top-4 right-4 z-50 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md p-2 rounded-xl border border-slate-800">
+                <span className="text-xs font-mono text-cyan-400 pl-2">Ambient Background Active</span>
+                <button
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className="px-2.5 py-1 rounded bg-slate-800 text-xs font-mono text-slate-200"
+                >
+                  {isPlaying ? "Pause" : "Play"}
+                </button>
+                <button
+                  onClick={() => setFullBleed(false)}
+                  className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200"
+                  title="Exit Full Bleed"
+                >
+                  <Minimize2 className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Playback & Continuous Transport Bar */}
