@@ -8,11 +8,13 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/echosh-labs/amra-treasury/internal/amra"
 	"github.com/echosh-labs/amra-treasury/internal/api"
 	"github.com/echosh-labs/amra-treasury/internal/config"
 	"github.com/echosh-labs/amra-treasury/internal/db"
+	"github.com/echosh-labs/amra-treasury/internal/studio"
 	"github.com/echosh-labs/amra-treasury/internal/youtube"
 )
 
@@ -384,6 +386,56 @@ func (h *Handler) handleToolsList() map[string]any {
 				},
 			},
 		},
+		{
+			Name:        "studio_render_video",
+			Description: "Launch headless background video compilation for a sacred geometry timeline manifest (generates MP4 with pure harmonic tone).",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title":          map[string]any{"type": "string", "description": "Title of the composition"},
+					"duration_sec":   map[string]any{"type": "number", "description": "Duration in seconds (default: 108.0)"},
+					"wave_mode":      map[string]any{"type": "string", "description": "orbital_swirl, standing_wave, singularity_ingestion, doppler_vortex (default: standing_wave)"},
+					"palette":        map[string]any{"type": "string", "description": "alchemical, solfeggio, chakra, golden_angle, multivariate_facets (default: alchemical)"},
+					"backdrop_style": map[string]any{"type": "string", "description": "solar_corona, cosmic_aurora, emerald_matrix, obsidian (default: solar_corona)"},
+					"enable_object":  map[string]any{"type": "boolean", "description": "Layer parametric Vedic Āmra Rūpa object over toroid (default: true)"},
+					"frequency_hz":   map[string]any{"type": "number", "description": "Harmonic audio station frequency (e.g. 528.0, 432.0)"},
+				},
+			},
+		},
+		{
+			Name:        "studio_get_render_job",
+			Description: "Query progress percentage, frame count, rendering status, and output path for a video compilation job.",
+			InputSchema: map[string]any{
+				"type":     "object",
+				"required": []string{"job_id"},
+				"properties": map[string]any{
+					"job_id": map[string]any{"type": "string", "description": "Render job ID"},
+				},
+			},
+		},
+		{
+			Name:        "studio_dispatch_video",
+			Description: "Publish a completed render job artifact directly to YouTube with custom privacy status (unlisted, private, public) and category.",
+			InputSchema: map[string]any{
+				"type":     "object",
+				"required": []string{"job_id"},
+				"properties": map[string]any{
+					"job_id":         map[string]any{"type": "string", "description": "Completed render job ID"},
+					"privacy_status": map[string]any{"type": "string", "description": "unlisted, private, or public (default: unlisted)"},
+					"category_id":    map[string]any{"type": "string", "description": "YouTube category ID (default: 22)"},
+				},
+			},
+		},
+		{
+			Name:        "studio_list_media",
+			Description: "Scan and catalog local media library across Renders, Shaolin Physical Mastery, Esoteric, and Vault.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"category": map[string]any{"type": "string", "description": "Optional category filter: renders, shaolin_mastery, esoteric_study, vault_archive"},
+				},
+			},
+		},
 	}
 	return map[string]any{"tools": tools}
 }
@@ -644,6 +696,123 @@ func (h *Handler) handleToolsCall(ctx context.Context, params any) (map[string]a
 				result = ToolResult{Content: []ToolContent{{Type: "text", Text: string(b)}}}
 			}
 		}
+
+	case "studio_render_video":
+		title, _ := p.Arguments["title"].(string)
+		if title == "" {
+			title = "Sacred Toroidal Meditation"
+		}
+		duration := 108.0
+		if d, ok := p.Arguments["duration_sec"].(float64); ok && d > 0 {
+			duration = d
+		}
+		waveMode, _ := p.Arguments["wave_mode"].(string)
+		if waveMode == "" {
+			waveMode = "standing_wave"
+		}
+		palette, _ := p.Arguments["palette"].(string)
+		if palette == "" {
+			palette = "alchemical"
+		}
+		backdrop, _ := p.Arguments["backdrop_style"].(string)
+		if backdrop == "" {
+			backdrop = "solar_corona"
+		}
+		freq := 528.0
+		if f, ok := p.Arguments["frequency_hz"].(float64); ok && f > 0 {
+			freq = f
+		}
+		enableObj := true
+		if eo, ok := p.Arguments["enable_object"].(bool); ok {
+			enableObj = eo
+		}
+
+		m := &studio.StudioTimelineManifest{
+			ID:          fmt.Sprintf("manifest_%d", time.Now().Unix()),
+			Title:       title,
+			Description: fmt.Sprintf("Sacred toroidal geometry composition (%s wave, %s palette, %.1fHz)", waveMode, palette, freq),
+			Tags:        []string{"SacredGeometry", "Toroid", "AmraTreasury"},
+			Canvas: studio.CanvasConfig{
+				Width: 1280, Height: 720, FPS: 30, Orientation: studio.OrientationLandscape16x9,
+			},
+			PatternLoop: studio.PatternLoopConfig{
+				BaseCycleSec: duration, RepeatCount: 1, OctaveModulation: true, HueShiftDegPerCycle: 30.0,
+			},
+			Background: studio.BackgroundTrackConfig{
+				MajorRadius: 145.0, MinorRadius: 92.0, LineCount: 108, MissMargin: 9.0, TiltAngle: 32.0,
+				WaveMode: waveMode, Palette: palette, BackdropStyle: backdrop, CirculationSpeed: 1.25, SpaceGlow: 0.65,
+			},
+			Audio: []studio.AudioTrackConfig{
+				{ID: "tone", Role: "harmonic_drone", FrequencyHz: freq, BinauralBeatHz: 7.83, Volume: 0.85, Loop: true},
+			},
+		}
+		m.EnsureDefaults()
+		if !enableObj {
+			m.Objects = nil
+		}
+
+		renderer := h.apiHandler.GetStudioHandler().GetRenderer()
+		job, err := renderer.LaunchJob(ctx, m)
+		if err != nil {
+			result = ToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Failed to launch render: %v", err)}}}
+		} else {
+			b, _ := json.MarshalIndent(job, "", "  ")
+			result = ToolResult{Content: []ToolContent{{Type: "text", Text: string(b)}}}
+		}
+
+	case "studio_get_render_job":
+		jobID, _ := p.Arguments["job_id"].(string)
+		if jobID == "" {
+			result = ToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "job_id is required"}}}
+		} else {
+			renderer := h.apiHandler.GetStudioHandler().GetRenderer()
+			job, exists := renderer.GetJob(jobID)
+			if !exists {
+				result = ToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "Job not found"}}}
+			} else {
+				b, _ := json.MarshalIndent(job, "", "  ")
+				result = ToolResult{Content: []ToolContent{{Type: "text", Text: string(b)}}}
+			}
+		}
+
+	case "studio_dispatch_video":
+		jobID, _ := p.Arguments["job_id"].(string)
+		privacy, _ := p.Arguments["privacy_status"].(string)
+		category, _ := p.Arguments["category_id"].(string)
+		if jobID == "" {
+			result = ToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "job_id is required"}}}
+		} else {
+			renderer := h.apiHandler.GetStudioHandler().GetRenderer()
+			bridge := h.apiHandler.GetStudioHandler().GetBridge()
+			job, exists := renderer.GetJob(jobID)
+			if !exists {
+				result = ToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: "Render job not found"}}}
+			} else {
+				res, err := bridge.DispatchRenderJob(ctx, job, privacy, category)
+				if err != nil {
+					result = ToolResult{IsError: true, Content: []ToolContent{{Type: "text", Text: fmt.Sprintf("Dispatch failed: %v", err)}}}
+				} else {
+					b, _ := json.MarshalIndent(res, "", "  ")
+					result = ToolResult{Content: []ToolContent{{Type: "text", Text: string(b)}}}
+				}
+			}
+		}
+
+	case "studio_list_media":
+		category, _ := p.Arguments["category"].(string)
+		mediaCDN := h.apiHandler.GetStudioHandler().GetMediaCDN()
+		items := mediaCDN.ScanDirectories()
+		if category != "" {
+			var filtered []*studio.MediaItem
+			for _, it := range items {
+				if it.Category == category {
+					filtered = append(filtered, it)
+				}
+			}
+			items = filtered
+		}
+		b, _ := json.MarshalIndent(map[string]any{"total": len(items), "media": items}, "", "  ")
+		result = ToolResult{Content: []ToolContent{{Type: "text", Text: string(b)}}}
 
 	default:
 		return nil, &Error{Code: ErrCodeNoMethod, Message: fmt.Sprintf("Unknown tool: %s", p.Name)}

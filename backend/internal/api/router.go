@@ -39,6 +39,8 @@ func RegisterRoutes(mux *http.ServeMux, handler *Handler) {
 	// System Liveness & Telemetry
 	mux.HandleFunc("GET /healthz", handler.HealthzHandler)
 	mux.HandleFunc("GET /api/telemetry", handler.TelemetryHandler)
+	mux.HandleFunc("GET /api/v1/routes", handler.RoutesCatalogHandler)
+	mux.HandleFunc("GET /api/v1/system/routes", handler.RoutesCatalogHandler)
 
 	// YouTube Sovereign Studio Endpoints
 	mux.HandleFunc("GET /api/v1/youtube/status", handler.YouTubeStatusHandler)
@@ -80,6 +82,10 @@ func RegisterRoutes(mux *http.ServeMux, handler *Handler) {
 	mux.HandleFunc("GET /api/v1/studio/jobs", handler.studioHandler.ListRenderJobsHandler)
 	mux.HandleFunc("GET /api/v1/studio/jobs/{id...}", handler.studioHandler.GetRenderJobHandler)
 	mux.HandleFunc("POST /api/v1/studio/dispatch", handler.studioHandler.DispatchToYouTubeHandler)
+
+	// Sovereign Local Media CDN & Video Playback Endpoints
+	mux.HandleFunc("GET /api/v1/studio/media/catalog", handler.studioHandler.CatalogMediaHandler)
+	mux.HandleFunc("GET /api/v1/studio/media/stream/{id...}", handler.studioHandler.StreamVideoHandler)
 
 	// Esoteric Document Catalog Endpoints
 	mux.HandleFunc("GET /api/v1/esoteric", handler.GetEsotericCatalogHandler)

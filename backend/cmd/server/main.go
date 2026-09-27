@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"log"
@@ -95,6 +96,19 @@ func main() {
 	if subFS != nil {
 		fileServer := http.FileServer(http.FS(subFS))
 		rootMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			// 1. Guard API and MCP namespaces: Unmatched API routes must return JSON 404
+			if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/mcp") {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"error":  "API route not found",
+					"path":   r.URL.Path,
+					"method": r.Method,
+					"status": http.StatusNotFound,
+				})
+				return
+			}
+
 			path := strings.TrimPrefix(r.URL.Path, "/")
 			if path == "" {
 				path = "index.html"
@@ -107,19 +121,19 @@ func main() {
 				return
 			}
 
-			// If HTML version exists (e.g. /treasury -> treasury.html)
-			if f, err := subFS.Open(path + ".html"); err == nil {
-				_ = f.Close()
-				r.URL.Path = "/" + path + ".html"
-				fileServer.ServeHTTP(w, r)
+			// If HTML version exists (e.g. /treasury -> treasury.html), serve directly
+			if htmlData, err := fs.ReadFile(subFS, path+".html"); err == nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(htmlData)
 				return
 			}
 
-			// SPA Fallback: serve index.html for unrecognized routes
-			if f, err := subFS.Open("index.html"); err == nil {
-				_ = f.Close()
-				r.URL.Path = "/index.html"
-				fileServer.ServeHTTP(w, r)
+			// SPA Fallback: serve index.html directly with 200 OK (eliminating 301 redirect loops)
+			if indexData, err := fs.ReadFile(subFS, "index.html"); err == nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(indexData)
 				return
 			}
 
@@ -134,6 +148,18 @@ func main() {
 <p>Service operational on port ` + cfg.Port + `. Frontend build pending.</p>
 </body>
 </html>`))
+		})
+	} else {
+		// Fallback when subFS is nil: still guard API routes
+		rootMux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error":  "API route not found",
+				"path":   r.URL.Path,
+				"method": r.Method,
+				"status": http.StatusNotFound,
+			})
 		})
 	}
 

@@ -1,6 +1,8 @@
 # Binaries and build outputs
 bin/
 *.exe
+server
+backend/server
 dist/
 out/
 .next/

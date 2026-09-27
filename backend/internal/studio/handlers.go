@@ -3,6 +3,7 @@ package studio
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 
@@ -15,6 +16,7 @@ type Handler struct {
 	streamer    *LiveStreamer
 	renderer    *HeadlessRenderer
 	bridge      *YouTubeBridge
+	mediaCDN    *LocalMediaCDN
 	manifestsMu sync.RWMutex
 	manifests   map[string]*StudioTimelineManifest
 }
@@ -26,6 +28,7 @@ func NewHandler(uploader *youtube.Uploader, rendersDir string) *Handler {
 		streamer:  NewLiveStreamer(),
 		renderer:  NewHeadlessRenderer(rendersDir),
 		bridge:    NewYouTubeBridge(uploader),
+		mediaCDN:  NewLocalMediaCDN(rendersDir),
 		manifests: make(map[string]*StudioTimelineManifest),
 	}
 
@@ -209,3 +212,81 @@ func (h *Handler) DispatchToYouTubeHandler(w http.ResponseWriter, r *http.Reques
 		"result":  result,
 	})
 }
+
+// CatalogMediaHandler returns the indexed media library across renders, physical mastery, esoteric study, and vaults.
+func (h *Handler) CatalogMediaHandler(w http.ResponseWriter, r *http.Request) {
+	category := r.URL.Query().Get("category")
+	items := h.mediaCDN.ScanDirectories()
+
+	if category != "" {
+		filtered := make([]*MediaItem, 0)
+		for _, it := range items {
+			if it.Category == category {
+				filtered = append(filtered, it)
+			}
+		}
+		items = filtered
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"total": len(items),
+		"media": items,
+	})
+}
+
+// StreamVideoHandler streams video using HTTP 206 Partial Content byte ranges for zero-stutter scrubbing.
+func (h *Handler) StreamVideoHandler(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	mediaID := ""
+	if len(parts) >= 6 {
+		mediaID = parts[5]
+	} else if idQuery := r.URL.Query().Get("id"); idQuery != "" {
+		mediaID = idQuery
+	}
+
+	if mediaID == "" {
+		http.Error(w, `{"error":"media ID required"}`, http.StatusBadRequest)
+		return
+	}
+
+	item, exists := h.mediaCDN.GetItem(mediaID)
+	if !exists {
+		http.Error(w, `{"error":"media file not found"}`, http.StatusNotFound)
+		return
+	}
+
+	// Verify file exists on disk
+	fInfo, err := os.Stat(item.Path)
+	if err != nil || fInfo.IsDir() {
+		http.Error(w, `{"error":"media file inaccessible"}`, http.StatusNotFound)
+		return
+	}
+
+	// Set content headers
+	switch item.Format {
+	case "mp4":
+		w.Header().Set("Content-Type", "video/mp4")
+	case "webm":
+		w.Header().Set("Content-Type", "video/webm")
+	case "mkv":
+		w.Header().Set("Content-Type", "video/x-matroska")
+	case "mov":
+		w.Header().Set("Content-Type", "video/quicktime")
+	}
+
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+
+	// Standard library ServeFile natively implements RFC 7233 range requests
+	http.ServeFile(w, r, item.Path)
+}
+
+// GetRenderer returns the underlying HeadlessRenderer.
+func (h *Handler) GetRenderer() *HeadlessRenderer { return h.renderer }
+
+// GetBridge returns the underlying YouTubeBridge.
+func (h *Handler) GetBridge() *YouTubeBridge { return h.bridge }
+
+// GetMediaCDN returns the underlying LocalMediaCDN.
+func (h *Handler) GetMediaCDN() *LocalMediaCDN { return h.mediaCDN }
