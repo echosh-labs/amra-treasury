@@ -1,103 +1,106 @@
-# AMRA Sovereign Treasury & YouTube Studio (`amra-treasury`)
-# echosh-labs Single-Binary Sovereign Engine (Port 8050)
-
-`amra-treasury` is an independent, single-binary sovereign service within the `echosh-labs` ecosystem. It unifies YouTube Studio operations, video upload pipelines, monetization feedback loops, SaaS billing tiers, and an immutable BoltDB audit ledger, crowned with Vedic sacred geometry and alchemical shadow transmutation.
+# ⚖️ AMRA Sovereign Treasury & YouTube Studio (`amra-treasury`)
+> A single-binary financial command center, YouTube Studio automation engine, and generative parametric visualizer on **Port 8050**.
 
 ---
 
-## 🏛️ System Architecture
-
-- **Sovereign Port**: `8050`
-- **Host Execution Substrate**: WSL2 Ubuntu (`/home/justin/code/echosh-labs/amra-treasury`)
-- **Backend**: Go 1.23+ with embedded key-value document store (`bbolt`)
-- **Frontend**: Next.js 15 App Router static export bundled into the Go binary via `embed.FS`
-- **Containerization**: Multi-stage Docker build targeting Google Artifact Registry & Cloud Run
-
-```
-                                  [ Client Browser ]
-                                          |
-                              HTTP / SSE (Port 8050)
-                                          |
-                       +------------------v-------------------+
-                       |         amra-treasury Engine         |
-                       |       (Single Static Go Binary)      |
-                       +--------+--------------------+--------+
-                                |                    |
-                    +-----------v----+          +----v-------------+
-                    |  Embedded Web  |          |   Go API Core    |
-                    | (frontend_out) |          |  • /api/v1/amra  |
-                    +----------------+          |  • /api/v1/yt    |
-                                                |  • /api/v1/esot  |
-                                                +----+--------+----+
-                                                     |        |
-                         +---------------------------+        +-------------------+
-                         |                                                        |
-              +----------v-----------+                                 +----------v-----------+
-              |    Embedded BoltDB   |                                 |    External Clouds   |
-              |  • amra_ledger       |                                 |  • YouTube Data v3   |
-              |  • amra_idempotency  |                                 |  • YouTube Analytics |
-              |  • amra_subs         |                                 |  • Google Cloud SDK  |
-              |  • youtube_data      |                                 |  • Stripe Webhooks   |
-              |  • esoteric_content  |                                 +----------------------+
-              +----------------------+
-```
+## 🌟 The Vibe
+`amra-treasury` unifies sovereign revenue streams, media automation, and sacred mathematical visualization. Running as a self-contained single binary, it combines real-time YouTube monetization analytics, chunked video upload pipelines, SaaS subscription tiers, and an immutable BoltDB ledger—crowned with interactive parametric Kairi/mango curves and alchemical polar transmutations rendered dynamically on canvas.
 
 ---
 
-## 🚀 Quickstart & Verification Commands
+## 🚀 60-Second Quickstart
 
 ```bash
-# 1. Clear contentious processes on port 8050 and run full build & dev server
+# 1. Clone the repository
+git clone https://github.com/echosh-labs/amra-treasury.git
+cd amra-treasury
+
+# 2. Setup your local environment (Optional: operates fully in offline mode)
+cp .env.example .env
+
+# 3. Boot the development server (builds Next.js and starts Go API on Port 8050)
 make dev
+```
 
-# 2. Run backend unit test suites (AMRA, YouTube, Portutil, API)
-make test
+Once started:
+- **Interactive Treasury & Studio**: Open [http://localhost:8050](http://localhost:8050)
+- **API Health Check**: `GET http://localhost:8050/health`
+- **Sacred Geometry Canvas**: [http://localhost:8050/studio](http://localhost:8050/studio)
 
-# 3. Compile full single binary (Next.js export -> Go embed.FS -> bin/amra-treasury)
-make build
+> **Zero Cloud Setup Required:**  
+> If you don't have YouTube API or Google Cloud credentials, `amra-treasury` operates seamlessly in offline demonstration mode. The immutable BoltDB ledger, subscription management, and mathematical canvas visualizer work locally out of the box!
 
-# 4. Run automated end-to-end smoke test suite (12 endpoints verified)
-./test.sh
+---
+
+## 🗺️ Interactive Tour & Web Dashboard
+
+When visiting [http://localhost:8050](http://localhost:8050), explore four specialized docks:
+
+1. **Treasury Command (`/treasury`)**:
+   - **Unified MRR & Accrual**: Visualizes combined subscription revenue and 30-day YouTube ad earnings.
+   - **Immutable Audit Ledger**: Real-time table of double-entry financial events stored in local BoltDB.
+   - **SaaS Subscription Plans**: Sadhaka, Adept, Magus, and Sovereign Enterprise tier management.
+2. **YouTube Studio Dock (`/youtube`)**:
+   - **Channel Analytics**: Real-time retention gauges, view velocity, and estimated ad CPM.
+   - **Resumable Upload Engine**: Chunked background video uploader with real-time progress bars.
+   - **Monetization Sync**: One-click ingestion of verified YouTube revenue into the local ledger.
+3. **Generative Visual Studio (`/studio`)**:
+   - **Parametric Shader Canvas**: Real-time interactive polar coordinate visualizer for the sacred Kairi (mango) curve.
+   - **Alchemical Shadow Transmutations**: The 6 classical *Arishadvarga* inner obstacles mapped to dharmic frequencies.
+4. **Cloud Infrastructure Monitor**:
+   - **GCP Burn Rate Tracker**: Real-time cost monitoring with scale-to-zero enforcement metrics.
+
+---
+
+## 🏗️ Technical Architecture
+
+```
+amra-treasury/
+├── backend/                  # High-performance Go 1.24 Core
+│   ├── cmd/server/           # Service entrypoint (wires routes & embed.FS)
+│   ├── internal/
+│   │   ├── api/              # HTTP REST handlers & SSE event streams
+│   │   ├── studio/           # Generative shader & CDN media delivery
+│   │   ├── youtube/          # YouTube Data v3 & OAuth token manager
+│   │   └── db/               # Embedded BoltDB persistent storage engine
+├── frontend/                 # Next.js 15 (App Router + TailwindCSS)
+│   ├── app/                  # Studio, Treasury, and Alchemical routes
+│   └── components/           # Real-time ledger tables, shader canvas, metric cards
+├── scripts/                  # Port clearance, sync, and smoke test scripts
+└── Makefile                  # Unified automation interface
 ```
 
 ---
 
-## 📡 API Catalog
+## ⚙️ Environment Configuration
 
-### YouTube Sovereign Studio
-- `GET /api/v1/youtube/status`: Channel status, token validity, quota tracker.
-- `GET /api/v1/youtube/auth/url`: OAuth2 Google consent URL with offline refresh token.
-- `GET /api/v1/youtube/auth/callback`: OAuth2 code exchange handler.
-- `POST /api/v1/youtube/auth/disconnect`: Revoke and clear stored OAuth tokens.
-- `POST /api/v1/youtube/upload`: Initiate resumable chunked video upload.
-- `GET /api/v1/youtube/jobs`: List recent background upload jobs.
-- `GET /api/v1/youtube/jobs/{id}`: Detailed upload job status and progress.
-- `POST /api/v1/youtube/jobs/{id}/cancel`: Cancel active upload job.
-- `GET /api/v1/youtube/videos`: List uploaded channel videos.
-- `GET /api/v1/youtube/analytics`: Query retention, view duration, subscriber delta.
-- `GET /api/v1/youtube/finance`: Monetization report (estimated ad revenue, CPM).
-- `POST /api/v1/youtube/finance/sync-amra`: Ingest verified YouTube revenue into the immutable ledger.
+Copy `.env.example` to `.env` to customize settings:
 
-### AMRA Sovereign Treasury
-- `GET /api/v1/amra/plans`: List active billing tiers (Sadhaka, Adept, Magus, Enterprise).
-- `POST /api/v1/amra/checkout`: Generate checkout session.
-- `POST /api/v1/amra/webhook/{provider}`: Ingest webhook events with SHA-256 idempotency deduplication.
-- `GET /api/v1/amra/subscriptions/{id}`: Retrieve customer subscription state.
-- `GET /api/v1/amra/ledger`: Retrieve immutable audit transactions from BoltDB.
-- `GET /api/v1/amra/metrics`: Compute unified ecosystem metrics (SaaS MRR + YouTube 30d Accrual).
-- `GET /api/v1/amra/geometry`: Parametric Kairi/mango curve and Arishadvarga polar transmutations.
-- `POST /api/v1/amra/geometry`: Re-render sacred geometry with custom parameters.
-- `GET /api/v1/amra/gcloud/status`: GCP project and billing account topology.
-- `GET /api/v1/amra/gcloud/billing`: Infrastructure burn rate, scale-to-zero status, and sovereign margin.
-- `POST /api/v1/amra/gcloud/sync-ledger`: Commit monthly cloud expense to the immutable ledger.
+```env
+PORT=8050
 
-### Esoteric Documents & Philosophy
-- `GET /api/v1/esoteric`: Catalog of esoteric documents stored in BoltDB.
-- `GET /api/v1/esoteric/arishadvarga`: The 6 classical inner adversaries and their dharmic transmutations.
-- `GET /api/v1/esoteric/{key}`: Retrieve arbitrary esoteric document.
+# YouTube Studio OAuth Credentials (Optional)
+# Obtain from Google Cloud Console -> APIs & Services -> Credentials
+YOUTUBE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+YOUTUBE_CLIENT_SECRET=your-client-secret
+YOUTUBE_REDIRECT_URL=http://localhost:8050/api/v1/youtube/auth/callback
+
+# Google Cloud Project Monitoring (Optional)
+GCP_PROJECT_ID=your-gcp-project-id
+```
 
 ---
 
-## 🔒 Port Allocation
-- Assigned Port: **8050**
-- Google OAuth Redirect URI: `http://localhost:8050/api/v1/youtube/auth/callback`
+## 🛠️ Build & Verification Commands
+
+| Command | Action |
+| :--- | :--- |
+| `make dev` | Starts frontend watch and Go server on Port 8050. |
+| `make test` | Runs Go backend unit tests (YouTube client, token storage, API routing). |
+| `make build` | Exports Next.js frontend to static HTML and bundles into a standalone Go binary (`bin/amra-treasury`). |
+| `./test.sh` | Executes automated end-to-end smoke tests against 12 live API endpoints. |
+
+---
+
+## 📄 License
+Dual-licensed under the AGPL-3.0 and commercial enterprise licensing from [echoSH labs](https://echosh-labs.com).
